@@ -283,6 +283,7 @@
         <div class="mdl-layout__tab-bar mdl-js-ripple-effect mdl-color--primary-dark">
           <a href="#overview" class="mdl-layout__tab is-active">Uitleg</a>
           <a href="#leerdoelen" class="mdl-layout__tab">Leerdoelen</a>
+          <a href="#niveaus" class="mdl-layout__tab">Niveaus</a>
           <a href="#obk" class="mdl-layout__tab">OBK</a>
           <a href="#kerndoelen" class="mdl-layout__tab">Kerndoelen</a>
           <a href="#examenprogramma" class="mdl-layout__tab">Examenprogramma</a>
@@ -579,9 +580,31 @@
           <section class="mdl-grid">
             <div class="mdl-cell mdl-cell--6-col">
               <h4>Examenprogramma Invoer</h4>
+              <div class="mdl-grid">
+              	<span class="slo-errors" data-simply-field="errors"></span>
+                <div class="mdl-layout-spacer"></div>
+                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
+                <input class="slo-hidden" type="file" multiple data-simply-command="uploadExamenXLSX" accept=".xlsx"></label>
+              </div>
             </div>
-            <div class="mdl-cell mdl-cell--6-col">
+            <div class="mdl-cell mdl-cell--6-col" id="examenprogramma_info">
               <h4>Examenprogramma Structuur</h4>
+            </div>            
+          </section>
+        </div>
+        <div class="mdl-layout__tab-panel mdl-slo-panel" id="niveaus">
+          <section class="mdl-grid">
+            <div class="mdl-cell mdl-cell--6-col">
+              <h4>Niveau Invoer</h4>
+              <div class="mdl-grid">
+              	<span class="slo-errors" data-simply-field="errors"></span>
+                <div class="mdl-layout-spacer"></div>
+                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
+                <input class="slo-hidden" type="file" multiple data-simply-command="uploadNiveauXLSX" accept=".xlsx"></label>
+              </div>
+            </div>
+            <div class="mdl-cell mdl-cell--6-col" id="niveau_info">
+              <h4>Niveau Structuur</h4>
             </div>            
           </section>
         </div>
@@ -649,6 +672,9 @@
     <script src="js/simply/simply.everything.js"></script>
     <script src="js/slo.js"></script>
     <script src="js/filesaver.js"></script>
+    <script src="js/examenprogramma-config.js"></script>
+    <script src="js/niveau-config.js"></script>
+    <script src="js/ldk-config.js"></script>
     <script src="js/import-sheet.js"></script>
     <script src="js/parse-sheet.js"></script>
     <script src="node_modules/jszip/dist/jszip.min.js"></script>
