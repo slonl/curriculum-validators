@@ -23,7 +23,9 @@ importSheet = (function() {
         }, config);
 
 
+		console.log('sheet: '+sheet.fileName);
         var tree = {
+			fileName: sheet.fileName,
             childID: [],
             all: [],
             ids: {},
@@ -34,6 +36,10 @@ importSheet = (function() {
         };
 
         var hasParent = [];
+
+		var getExcelIndex = function(node) {
+			return '['+node._sheet+':'+node._row+'] ';
+		}
 
         //FIXME: build tree with full OBK ids, so vak, vak+vakkern, vak+vakkern+vaksubkern, etc.
         // this fixes the problem when two identical OBK ids occur under different parents
@@ -65,7 +71,7 @@ importSheet = (function() {
                         if (node.Type!='Vak') {
                             //FIXME: configure top level Type somewhere
 //                            throw new Error('could not find ParentID',node);
-                            tree.errors.push('Missende Parent '+node.ParentID+' bij '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+')');
+                            tree.errors.push(getExcelIndex(node)+'Missende Parent '+node.ParentID+' bij '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+')');
                         }
                     }
                 }
@@ -76,16 +82,42 @@ importSheet = (function() {
             return idStack.join(';');
         };
 
-        sheet.forEach(function(row, index) {
-            var node = new RowNode(row, index);
-            tree.all[index] = node;
-            var fullID = getFullID(node);
-            node.fullID = fullID;
-            tree.fullIds[fullID] = node;
-            if (!tree.ids[node[config.ID]]) {
-                tree.ids[node[config.ID]] = []; // allow more than one row with the same ID
+        var getType = function(type) {
+            var alias = config.alias;
+            if (!type) {
+                return '';
             }
-            tree.ids[node[config.ID]].push(node);
+            type = type.toLowerCase().trim();
+            if (alias[type]) {
+                type = alias[type];
+            }
+            return type;
+        }
+
+
+		var counter = 0;
+        sheet.forEach(function(row, index) {			
+            var node = new RowNode(row, counter);
+			node._sheet = sheet.fileName;
+			node._row = index+2; // excel begint bij row 1 (+1) en de titel row telt niet mee (+1)
+			node.Type = getType(node.Type);
+			if (!config.types[node.Type]) {
+				if (config.filterTypes[node.Type]) {
+	           		tree.fixes.push(getExcelIndex(node)+'Verwijderd volgens filterTypes lijst: '+node.Title+' ('+node.Type+')');
+				} else {
+	                tree.errors.push(getExcelIndex(node)+'Onbekend type: '+node.Title+' ('+node.Type+')');
+				}
+			} else {
+	            tree.all[counter] = node;
+	            var fullID = getFullID(node);
+	            node.fullID = fullID;
+	            tree.fullIds[fullID] = node;
+	            if (!tree.ids[node[config.ID]]) {
+	                tree.ids[node[config.ID]] = []; // allow more than one row with the same ID
+	            }
+	            tree.ids[node[config.ID]].push(node);
+				counter++;
+			}
         });
 
         // link parents to children
@@ -109,7 +141,7 @@ importSheet = (function() {
                             if (parentRootFullID != rootFullID) {
                                 parent = null;
                             } else {
-                                tree.fixes.push('Missende Parent voor '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+') - vervangen door '+parent.Prefix+': '+parent.Title+' ('+parent.Type+')');
+                                tree.fixes.push(getExcelIndex(node)+'Missende Parent voor '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+') - vervangen door '+parent.Prefix+': '+parent.Title+' ('+parent.Type+')');
                             }
                             break;
                         }
@@ -121,14 +153,14 @@ importSheet = (function() {
                         var parentRootFullID = parentNode.fullID.split(';').shift();
                         if (parentRootFullID == rootFullID) {
                             parent = parentNode; //FIXME: what if there is more than one?
-                            tree.fixes.push('Missende Parent voor '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+') - vervangen door '+parent.Prefix+': '+parent.Title+' ('+parent.Type+')');
+                            tree.fixes.push(getExcelIndex(node)+'Missende Parent voor '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+') - vervangen door '+parent.Prefix+': '+parent.Title+' ('+parent.Type+')');
                         }
                     });
                 }
                 if (!parent) {
                     hasParent[node._id]=false;
                     if (node.Type!=config.topLevel) { //FIXME: configure check on top level types
-                        tree.errors.push('Missende ParentID bij '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+')');
+                        tree.errors.push(getExcelIndex(node)+'Missende ParentID bij '+node.ID+' '+node.Prefix+': '+node.Title+' ('+node.Type+')');
                     }
                 } else {
                     if (!parent.childID) {
@@ -167,9 +199,14 @@ importSheet = (function() {
         import: function(sheet, config) {
             var combinedSheet = [];
             Object.keys(sheet).forEach(function(sheetName) {
-                combinedSheet = combinedSheet.concat(sheet[sheetName]);
+				if (sheetName != 'fileName') {
+	                combinedSheet = combinedSheet.concat(sheet[sheetName]);
+				}
             });
+			combinedSheet.fileName = sheet.fileName;
             var errors  = 0;
+
+
 
             var tree = buildTree(combinedSheet, config);
             return tree;
@@ -214,7 +251,8 @@ importSheet = (function() {
                 all: [],
                 ids: {},
                 fullIds: {},
-                errors: []
+                errors: [],
+				fixes: []
             };
             // read each tree and change node._id to have a sheet prefix
             // append the data to the fulltree
@@ -240,6 +278,9 @@ importSheet = (function() {
                 tree.childID.forEach(function(chID) {
                     fulltree.childID.push(chID+offset);
                 });
+				fulltree.errors = fulltree.errors.concat(tree.errors);
+				fulltree.fixes  = fulltree.fixes.concat(tree.fixes);
+
                 fulltree.config = tree.config;
             });
             // TODO: remove duplicate nodes - whith no difference in the data at all.
