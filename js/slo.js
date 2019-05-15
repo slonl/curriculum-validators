@@ -158,6 +158,12 @@
             uploadKerndoelenXLSX: function(el, value) {
                 this.app.actions.uploadKerndoelenXLSX(el, value);
             },
+			uploadExamenXLSX: function(el, value) {
+				this.app.actions.uploadExamenXLSX(el);
+			},
+			uploadNiveauXLSX: function(el, value) {
+				this.app.actions.uploadNiveauXLSX(el);
+			},
             toggleStruct: function(el, value) {
                 this.app.actions.toggleStruct(el, value);
             },
@@ -765,636 +771,104 @@ console.log('obk tree done');
 				reader.readAsBinaryString(upload.files[0]);	
 
 			},
+			uploadExamenXLSX: function(upload) {
+                var processFile = function(file) {
+                	return new Promise(function(resolve, reject) {
+						var reader = new FileReader();
+						reader.onload = function(e) {
+							var data = e.target.result;
+							var workbook = XLSX.read(data, {
+								type: 'binary'
+							});
+							var sheets = {};
+							workbook.SheetNames.forEach(function(sheetName) {
+								sheets[sheetName] = XLSX.utils.sheet_to_row_object_array(
+									workbook.Sheets[sheetName]
+								);
+							});
+							//finish(sheets);
+							resolve(sheets);
+						};
+						reader.onerror = function(ex) {
+							console.error(ex);
+							reject(ex);
+						};
+						reader.readAsBinaryString(file);
+					});
+				};
+				var files = Array.from(upload.files);
+				var sheets = [];
+				var processFiles = function() {
+					var file = files.pop();
+					if (file) {
+						return processFile(file).then(function(sheet) {
+							sheet.fileName = file.name;
+							sheets.push(sheet);
+							return processFiles();
+						});
+					}
+					return sheets;
+				};
+				processFiles().then(function(sheets) {
+					var tree = importSheet.importAll(sheets, examenConfig, function(tree) {
+						// correct stuff that can only be done per tree/sheet
+						// change all ID/ParentID's that aren't UUID's to uuid, since these can be things like '1A', which may occur in multiple sheets
+						// corrigeer alle ID's en links naar ID's
+						return tree;
+					});
+					parseTree(tree, examenConfig, document.getElementById('examenprogramma_info'));
+				});
+			},
+			uploadNiveauXLSX: function(upload) {
+                var processFile = function(file) {
+                	return new Promise(function(resolve, reject) {
+						var reader = new FileReader();
+						reader.onload = function(e) {
+							var data = e.target.result;
+							var workbook = XLSX.read(data, {
+								type: 'binary'
+							});
+							var sheets = {};
+							workbook.SheetNames.forEach(function(sheetName) {
+								sheets[sheetName] = XLSX.utils.sheet_to_row_object_array(
+									workbook.Sheets[sheetName]
+								);
+							});
+							//finish(sheets);
+							resolve(sheets);
+						};
+						reader.onerror = function(ex) {
+							console.error(ex);
+							reject(ex);
+						};
+						reader.readAsBinaryString(file);
+					});
+				};
+				var files = Array.from(upload.files);
+				var sheets = [];
+				var processFiles = function() {
+					var file = files.pop();
+					if (file) {
+						return processFile(file).then(function(sheet) {
+							sheet.fileName = file.name;
+							sheets.push(sheet);
+							return processFiles();
+						});
+					}
+					return sheets;
+				};
+				processFiles().then(function(sheets) {
+					var tree = importSheet.importAll(sheets, niveauConfig, function(tree) {
+						// correct stuff that can only be done per tree/sheet
+						// change all ID/ParentID's that aren't UUID's to uuid, since these can be things like '1A', which may occur in multiple sheets
+						// corrigeer alle ID's en links naar ID's
+						return tree;
+					});
+					parseTree(tree, niveauConfig, document.getElementById('niveau_info'));
+				});
+			},
 
 			uploadLD2XLSX: function(upload, target) {
-/*				var finish = function(tree) {
-					console.log(tree);
-
-					var findChildrenByType = function(node, type) {
-						if (node.Type == type) {
-							return node;
-						}
-						if (node.childID) {
-							var nodes = [];
-							node.childID.forEach(function(chId) {
-								var subnodes = findChildrenByType(tree.all[chId], type);
-								if (subnodes) {
-									nodes = nodes.concat(subnodes);
-								}
-							});
-							return flatten(nodes).filter(onlyUnique);
-						}
-						return null;
-					};
-
-					var removeChild = function(node, child) {
-						node.childID = node.childID.filter(function(childId) {
-							return childId!=child._id;
-						});
-						child.ParentID = null;
-					};
-
-					var addChild = function(node, child) {
-						if (!node.childID) {
-							node.childID = [];
-						}
-						if (node.childID.indexOf(child._id)==-1) {
-							node.childID.push(child._id);
-						}
-						child.ParentID = node.ID;
-					};
-					var getType = function(type) {
-						var alias = {
-							'kern': 'vakkern',
-							'subkern': 'vaksubkern',
-							'inhoud': 'vakinhoud'
-						};
-						type = type.toLowerCase().trim();
-						if (alias[type]) {
-							type = alias[type];
-						}
-						return type;
-					}
-					var getNearestParent = function(node) {
-						var types = {
-							'doel': ['vak','vakkern','vaksubkern','doelniveau'],
-							'kerndoel': ['vak','vakkern','vaksubkern','doelniveau'],
-							'doelniveau': ['vakinhoud','vaksubkern','vakkern','vak'],
-							'vakinhoud': ['vaksubkern'],
-							'vaksubkern': ['vakkern'],
-							'vakkern': ['vak']
-						}
-						var nodeType = getType(node.Type);
-						if (types[nodeType]) {
-							for (var i=node._id-1; i>=0; i--) {
-								var p = tree.all[i];
-								var pt = getType(p.Type);
-								if (types[nodeType].indexOf(pt)!==-1) {
-									return p;
-								}
-							}
-						}
-						return null;
-					}
-					var getParent = function(node) {
-						var parent = null;
-						if (node.fullID) {
-							var parentFullID = node.fullID.split(';');
-							parentFullID.pop();
-							parentFullID = parentFullID.join(';');
-							if (parentFullID && parentFullID!=node.fullID && tree.fullIds[parentFullID]) {
-								parent = tree.fullIds[parentFullID];
-							}
-						}
-						if (!parent && node.ParentID) {
-							var parents = tree.ids[node.ParentID];
-							parents = parents.filter(function(parent) {
-								return parent.childID && parent.childID.indexOf(node._id)!==-1;
-							});
-							parent = parents[0]; // should only be one
-						}
-						if (!parent) {
-							var parent = getNearestParent(node);
-							if (parent) {
-								console.log('Missing ParentID for '+node._id+':'+node.ID+' '+node.Prefix+':'+node.Title+'; substituted: '+parent.ID+' '+parent.Prefix+':'+parent.Title);
-								node.ParentID = parent.ID;
-							} else if (node.Type!='Vak') { //FIXME: check configuration for top level type
-								console.log('Missing ParentID for '+node._id+':'+node.ID+' '+node.Type+' '+node.Title+'; could not find substitute;');
-							}
-						}
-						return parent;
-					};
-
-					var arraysEqual = function(arr1, arr2) {
-						var all = arr1.concat(arr2);
-						var unique = all.filter(onlyUnique);
-						return unique.length == 0;
-					};
-
-					var getHash = function(node) {
-						if (!node.Title) {
-							throw new Error('attempted hash of empty node');
-						}
-						return node.Prefix+':'+node.Title;
-					};
-
-					// attempt to build sensible ID's 
-					// if the nodes are the same across sheets, they should reuse the same uuid
-					// if not, then not, even if the ID (not - uuid) are the same
-					// only change ID's that aren't UUID's
-					var uuidMapping = {};
-					var removedIDs = {};
-					tree.all.forEach(function(node) {
-						if (!isUUID(node.ID)) {
-							var oldID = node.ID;
-							if (!removedIDs[oldID]) {
-								removedIDs[oldID] = [];
-							}
-							removedIDs[oldID].push(node);
-
-							var hash = getHash(node);
-							if (!uuidMapping[hash]) {
-								uuidMapping[hash] = uuidv4();
-							}
-							newID = uuidMapping[hash];
-							node.ID = newID;
-							tree.ids[node.ID] = [node];
-							tree.ids[oldID] = tree.ids[oldID].filter(function(node) {
-								return node.ID == oldID;
-							});
-						}
-						if (node.ParentID && removedIDs[node.ParentID]) {
-							var parents = removedIDs[node.ParentID];
-							node.ParentID = parents[parents.length-1].ID; // last node seen with this ID
-						}
-					});
-
-					// some sheets use ParentID before defining them, so catch these now
-					tree.all.forEach(function(node) {
-						if (node.ParentID && removedIDs[node.ParentID]) {
-							var parents = removedIDs[node.ParentID];
-							node.ParentID = parents[parents.length-1].ID; // last node seen with this ID
-						}
-					});
-
-					// corrigeer missende parents
-					tree.all.forEach(function(node) {
-						var parent = getParent(node); //fixes it inside getParent() if needed
-					});
-
-					// corrigeer types
-					tree.all.forEach(function(node) {
-						if (node.Type.match(/leerdoel|leerdoel kern|leerdoel subkern/i)) { // Engels heeft doelen als 'inhoud' staan
-							node.Type = 'doel';
-						}
-					});
-
-
-					var hierarchyErrors = 0;
-					var	fixHierarchyByPrefix = function(node, prefixes, level) {
-						var hierarchy = {
-							'vak': null,
-							'vakkern': 'vak',
-							'vaksubkern': 'vakkern',
-							'vakinhoud': 'vaksubkern'
-						};
-						var parent = getParent(node);
-						var nodeType = getType(node.Type);
-						var parentType = getType(parent.Type);
-						var rootID = node.fullID.split(';').shift();
-						var rootEntity = tree.fullIds[rootID];
-						if (hierarchy[nodeType] && hierarchy[nodeType]!=parentType) {
-							// find by prefix
-							if (node.Prefix) {
-								var parentPrefix = node.Prefix.split('.');
-								var p = '';
-								do {
-									p = parentPrefix.pop();
-								} while (parentPrefix.length && !p);
-								parentPrefix = parentPrefix.join('.');
-								if (prefixes[parentPrefix] && prefixes[parentPrefix+'.']) {
-									if (prefixes[parentPrefix] < prefixes[parentPrefix+'.']) {
-										parentPrefix+='.';
-									}
-								} else if (!prefixes[parentPrefix]) {
-									parentPrefix+='.';
-								}
-								if (prefixes[parentPrefix]) {
-									var newParent_id = prefixes[parentPrefix];
-									var newParent = tree.all[newParent_id];
-									var parentRootFullID = newParent.fullID.split(';')[0];
-									var myRootFullID = node.fullID.split(';')[0];
-									if (parentRootFullID === myRootFullID) {
-										var newParentType = getType(newParent.Type);
-										if (newParent && hierarchy[nodeType]==newParentType) {
-											node.ParentID = newParent.ID;
-											removeChild(parent, node);
-											addChild(newParent, node);
-										} else {
-											hierarchyErrors++;
-											console.log('hierarchy error for '+node.ID+': expected '+hierarchy[nodeType]+', got '+parentType+', prefix parent was '+newParent.Type+': '+node.Prefix+' '+node.Title);
-										}
-									} else {
-										hierarchyErrors++;
-										console.log('hierarchy error for '+node.ID+' unfixable');
-										tree.errors.push('ParentID fout in '+rootEntity.Title+' '+level+': '+node.Prefix+' - '+node.Title+' ('+node.Type+')');
-										debugger;
-									}
-								} else {
-									hierarchyErrors++;
-									tree.errors.push('ParentID fout in '+rootEntity.Title+': '+node.Prefix+' - '+node.Title+' ('+node.Type+')');
-									console.log('hierarchy error for '+node.ID+': expected '+hierarchy[nodeType]+', got '+parentType+', prefix '+parentPrefix+' not found');
-								}
-							} else {
-								hierarchyErrors++;
-								tree.errors.push('ParentID fout in '+rootEntity.Title+': '+node.Prefix+' - '+node.Title+' ('+node.Type+')');
-								console.log('hierarchy error for '+node.ID+': expected '+hierarchy[nodeType]+', got '+parentType+', no prefix');
-							}
-						}
-					};
-
-					// corrigeer de boom op basis van types en prefix
-					var prefixes = {};
-					var lastLevel = null;
-					tree.all.forEach(function(node) {
-						if (node.Level) {
-							lastLevel = node.Level;
-						}
-						if(node.Prefix) {
-							prefixes[node.Prefix] = node._id;
-							fixHierarchyByPrefix(node, prefixes, lastLevel);
-						}
-					});
-					if (hierarchyErrors) {
-						alert('hierarchy errors '+hierarchyErrors);
-					}
-
-					var doelniveauIndex = {};
-					// laad doelniveauIndex
-					tree.all.forEach(function(node) {
-						if (node.Type=='doelniveau') {
-							if (!doelniveauIndex[node.niveau_id]) {
-								doelniveauIndex[node.niveau_id] = [];
-							}
-							doelniveauIndex[node.niveau_id].push(node);
-						}
-					});
-
-					var getDoelNiveau = function(niveauId, nodes) {
-						var index = doelniveauIndex[niveauId];
-						if (index) {
-							for (var i=0, l=index.length; i<l; i++) {
-								if (index[i].childID && arraysEqual(index[i].childID, nodes)) {
-									return index[i];
-								}
-							}
-						} else {
-							doelniveauIndex[niveauId] = [];
-						}
-						// not found, create a new one
-						var doelniveau = {
-							Type: 'doelniveau',
-							ID: uuidv4(),
-							niveau_id: [niveauId],
-							childID: nodes,
-							_id: tree.all.length
-						};
-						tree.all.push(doelniveau);
-
-						doelniveauIndex[niveauId].push(doelniveau);
-						return doelniveau;
-					};
-
-					// vind alle doelen en maak daar doelniveau's van, als ze die nog niet als parent hebben
-					var getNiveau = function(level, node) {
-						if (niveaus[level]) {
-							return niveaus[level];
-						} else {
-							for (var i=node._id; i>=0; i--) {
-								var level = tree.all[i].Level;
-								if (level && niveaus[level]) {
-									return niveaus[level];
-								}
-							}
-						}
-						throw new Error('Niveau mist voor ',node);
-					};
-
-					tree.all.forEach(function(node) {
-						if (node.Type=='doel') {
-							var parent = getParent(node);
-							if (parent && parent.Type!='doelniveau') {
-								removeChild(parent, node);
-								if (!node.Level) {
-									node.Level = getNiveau('',node); // get default level
-								}
-								node.Level.split(',').forEach(function(level) {
-									var niveau = getNiveau(level.trim(),node);
-									var doelniveau = getDoelNiveau(niveau, [node._id]); //FIXME: hier lijkt alleen het laatste niveau uit te komen
-									parent.childID.push(doelniveau._id);
-								});
-							}
-						}
-					});
-
-					// vind alle kerndoelen en hang deze onder doelen
-					tree.all.forEach(function(node) {
-						var nodeType = getType(node.Type);
-						if (nodeType=='kerndoel') {
-							var parent = getParent(node);
-							if (parent && parent.type!='doelniveau') {
-								removeChild(parent, node);
-								var doelniveaus = findChildrenByType(parent, 'doelniveau');
-								doelniveaus.forEach(function(doelniveau) {
-									if (!doelniveau.kerndoel_id) {
-										doelniveau.kerndoel_id = [];
-									}
-									doelniveau.kerndoel_id.push(node.ID); // kerndoelen ID's staan vast, dus kan ik hier gewoon gebruiken
-									doelniveau.childID.push(node._id);
-									node.ParentID = doelniveau.ID;
-								});
-							}
-						}
-					});
-
-					// converteer types
-					// filter rows weg die geen bekend type hebben (log op console);
-					var types = {
-						'vak' : 'ldk_vak',
-						'kern' : 'ldk_vakkern',
-						'subkern' : 'ldk_vaksubkern',
-						'inhoud': 'ldk_vakinhoud',
-						'doelniveau': 'doelniveau',
-						'doel': 'doel',
-						'kerndoel': 'kerndoel' 
-					};
-
-					var removedCount = 0;
-					tree.all.forEach(function(node) {
-						var type = node.Type.toLowerCase().trim();
-						if (!types[type]) {
-							if (node.ParentID) {
-								tree.ids[node.ParentID].forEach(function(parent) {
-									console.log('removed ',node);
-									removeChild(parent, node);
-									removedCount++;
-								});
-							}
-						} else {
-							node.Type = types[type];
-						}
-					});
-					if (removedCount) {
-						alert('removed '+removedCount);
-					}
-
-					//hershuffle ID's - alle entiteiten krijgen nieuwe ID's
-					var isOBKID = function(id) {
-						return id.substring(0,3)=='bk:';
-					};
-					var replacements = {};
-					tree.all.forEach(function(node) {
-						if (isOBKID(node.ID)) {
-							switch (node.Type) {
-								case 'ldk_vak':
-									node.vak_id = node.ID;
-								break;
-								case 'ldk_vakkern':
-									node.vakkern_id = node.ID;
-								break;
-								case 'ldk_vaksubkern':
-									node.vaksubkern_id = node.ID;
-								break;
-								case 'ldk_vakinhoud':
-									node.vakinhoud_id = node.ID;
-								break;
-							}
-						}
-						// make sure ID's for vak/vakkern/vaksubkern get reused
-						if (typeof node.ID == 'undefined') {
-							console.log('node without id ',node); //FIXME: make sure these are reused based on something...
-							debugger;
-							return;
-						}
-						if (node.Type!='kerndoel' && isOBKID(node.ID)) {// || !isUUID(node.ID)) {
-							var oldID = node.ID;
-							var hash = getHash(node);
-							if (!replacements[hash]) {
-								node.ID = uuidv4();
-								replacements[hash] = node.ID;
-								tree.ids[node.ID] = [node];
-							} else {
-								// reuse - this can potentially be wrong...
-								node.ID = replacements[hash];
-								tree.ids[node.ID].push(node);
-							}
-							if (tree.ids[oldID]) {
-								tree.ids[oldID] = tree.ids[oldID].filter(function(node) {
-									return node.ID === oldID;
-								});
-							}
-						}
-					});
-
-					// vind alle andere nodes en maak daar entiteiten van (gecorrigeerd)
-					var entities = {
-						ldk_vak: [],
-						ldk_vakkern: [],
-						ldk_vaksubkern: [],
-						ldk_vakinhoud: [],
-						doelniveau: [],
-						doel: [],
-						tag: []
-					};
-					var seen = {};
-
-					var addChildEntities = function(nodeId) {
-						var node = tree.all[nodeId];
-						if (node.ID) {
-							if (!seen[node.ID]) {
-								if (entities[node.Type]) { // kerndoel is already in curriculum-kerndoelen
-									var entity = makeEntity(node);
-									seen[node.ID] = entity;
-									entities[node.Type].push( entity );
-								}
-							} else {
-								entity = seen[node.ID];
-								mergeEntity(entity, node);
-							}
-						}
-						if (node.childID) {
-							node.childID.forEach(addChildEntities);
-						}
-					};
-					var getChildrenByType = function(node, type) {
-						if (!node.childID) {
-							return [];
-						}
-						return node.childID.map(function(id) {
-							return tree.all[id];
-						}).filter(function(child) {
-							return child.Type == type;
-						}).map(function(child) {
-							return child.ID;
-						}).filter(onlyUnique);
-					};
-					var addTags = function(node, entity) {
-						var tags = node.Tags || node.tags;
-						if (!tags) {
-							return;
-						}
-						tags = tags.split(';').map((t) => t.trim());
-						tags.forEach(function(tag) {
-							tag = tag.trim();
-							var tag_id = null;
-							for (var i=entities.tag.length-1; i>=0; i--) {
-								if (entities.tag[i].title == tag) {
-									tag_id = entities.tag[i].id;
-								}
-							}
-							if (!tag_id) {
-								var tagEntity = {
-									id: uuidv4(),
-									title: tag
-								};
-								entities.tag.push(tagEntity);
-								tag_id = tagEntity.id;
-							}
-							if (!entity.tag_id) {
-								entity.tag_id = [];
-							}
-							entity.tag_id.push(tag_id);
-						});
-					};
-
-					var differenceCount = 0;
-					var mergeEntity = function(entity, node) {
-						var newEntity = makeEntity(node);
-						Object.keys(newEntity).forEach(function(key) {
-							if (typeof entity[key] == 'undefined') {
-								entity[key] = newEntity[key];
-							} else if (Array.isArray(newEntity[key])) {
-								entity[key] = entity[key].concat(newEntity[key]);
-								entity[key] = entity[key].filter(onlyUnique);
-							} else if (entity[key] != newEntity[key]) {
-								console.log('difference in '+entity.id+': '+key+' ('+entity[key]+'<>'+newEntity[key]+')',node);
-//								debugger;
-								//FIXME: split enitities to seperate ID's?
-								differenceCount++;
-							}
-						});
-					}
-					var makeEntity = function(node) {
-						var entity = {
-							id: node.ID
-						}
-						if (node.Type!='doelniveau') {
-							entity.prefix = node.Prefix;
-							entity.title = node.Title;
-							entity.description = node.Description;
-						};
-						if (node.Tags || node.tags) {
-							addTags(node, entity);
-						}
-						switch(node.Type) {
-							case 'kerndoel':
-							break;
-							case 'doel':
-							break;
-							case 'doelniveau':
-								entity.niveau_id = node.niveau_id;
-								entity.doel_id = getChildrenByType(node, 'doel');
-								entity.kerndoel_id = getChildrenByType(node, 'kerndoel');
-							break;
-							case 'ldk_vak':
-								entity.vak_id = node.vak_id;
-								entity.ldk_vakkern_id = getChildrenByType(node, 'ldk_vakkern');
-								entity.doelniveau_id = getChildrenByType(node, 'doelniveau');
-							break;
-							case 'ldk_vakkern':
-								entity.vakkern_id = node.vakkern_id;
-								entity.ldk_vaksubkern_id = getChildrenByType(node, 'ldk_vaksubkern');
-								entity.doelniveau_id = getChildrenByType(node, 'doelniveau');
-							break;
-							case 'ldk_vaksubkern':
-								entity.vaksubkern_id = node.vaksubkern_id;
-								entity.ldk_vakinhoud_id = getChildrenByType(node, 'ldk_vakinhoud');
-								entity.doelniveau_id = getChildrenByType(node, 'doelniveau');
-							break;
-							case 'ldk_vakinhoud':
-								entity.vakinhoud_id = node.vakinhoud_id;
-								entity.doelniveau_id = getChildrenByType(node, 'doelniveau');
-							break;
-							default: 
-								debugger;
-							break;
-						}
-						return entity;
-					}
-					tree.childID.forEach(addChildEntities);
-					if (differenceCount) {
-						alert('differences: '+differenceCount);
-					}
-					console.log(entities);
-
-					var downloadZipFile = function(data, fileNames, zipName) {
-						var zip = new JSZip();
-						Object.keys(fileNames).forEach(function(list) {
-							zip.file(fileNames[list], JSON.stringify(data[list], null, '\t'));
-						});
-						zip.generateAsync({type:'blob'})
-						.then(function(content){
-							saveAs(content, zipName);
-						});
-					};
-					var files = {
-						'ldk_vak': 'ldk.vakken.json',
-						'ldk_vakkern': 'ldk.vakkernen.json',
-						'ldk_vaksubkern': 'ldk.vaksubkernen.json',
-						'ldk_vakinhoud': 'ldk.vakinhouden.json',
-						'doelniveau': 'doelniveaus.json',
-						'doel': 'doelen.json',
-						'tag': 'tags.json'
-					};
-					if (tree.errors.length) {
-						document.querySelector('ul.slo-list-root').innerHTML = tree.errors.join('<br>');
-					} else {
-						downloadZipFile(entities, files, 'entities.zip');
-						document.querySelector('ul.slo-list-root').innerHTML = importSheet.toHTML(tree);
-					}
-//					debugger;
-/*
-					Object.keys(slo.all).forEach(function(id) {
-						if (typeof slo.all[id].Title == 'undefined') {
-							unique.push(Object.assign(slo.all[id], {
-								Title: '',
-								Prefix: '',
-								Type: '',
-								Level: '',
-								Description: ''
-							}));
-						}
-					});
-					unique = unique.concat(addedDoelNiveaus);
-
-					unique.forEach(function(row) {
-						if (checkJSONRow(slo.all[row.ID])) {
-							errors++;
-						}
-					});
-					unique.forEach(function(row) {
-						row.ChildID.split(',').forEach(function(childID) {
-							childID = childID.trim();
-							if (childID) {
-								if (!slo.parents[childID]) {
-									slo.parents[childID] = new Set();
-								}
-								slo.parents[childID].add(row.ID);
-							}
-						});
-					});
-					unique.forEach(function(row) {
-						row.Level = slo.all[row.ID].Level;	
-					});
-					findRoots();
-					slo.view.errors = errors;
-					slo.view[target] = unique;
-					var all = unique.map(function(row) {
-						return {
-							option: {
-								value: ''+row.ID,
-								innerHTML: ''+(row.Prefix?row.Prefix+' ':'') + row.Title
-							}
-						}
-					});
-                    slo.view[target+'-ids'] = all;
-					showStruct({
-						ChildID: slo.roots.join(',')
-					});
-                    slo.view[target+'-headers'] = ['ID','ChildID','Prefix','Title','Description','Type','Level'];
-* /
-				};
-*/
                 var processFile = function(file) {
                 	return new Promise(function(resolve, reject) {
 						var reader = new FileReader();
@@ -1432,7 +906,7 @@ console.log('obk tree done');
 					return sheets;
 				};
 				processFiles().then(function(sheets) {
-					var tree = importSheet.importAll(sheets, null, function(tree) {
+					var tree = importSheet.importAll(sheets, ldkConfig, function(tree) {
 						// correct stuff that can only be done per tree/sheet
 						// change all ID/ParentID's that aren't UUID's to uuid, since these can be things like '1A', which may occur in multiple sheets
 						// corrigeer alle ID's en links naar ID's
