@@ -1,4 +1,4 @@
-var parseTree = function(tree, config) {
+var parseTree = function(tree, config, container) {
     console.log(tree);
 
     var defaultConfig = {
@@ -44,7 +44,8 @@ var parseTree = function(tree, config) {
             'ldk_vakinhoud':true,
             'doelniveau':true,
             'doel':true,
-            'kerndoel':true 
+            'kerndoel':true,
+			'tag':true
         },
         // zijn gebruikte ID's links naar bestaande entiteiten, zoja onder welke property moeten ze bewaard worden
         links: {
@@ -97,6 +98,10 @@ var parseTree = function(tree, config) {
     Object.keys(config.niveaus).forEach(function(niveau) {
         reverseNiveaus[config.niveaus[niveau]] = niveau;
     });
+
+	var getExcelIndex = function(node) {
+		return '['+node._sheet+':'+node._row+'] ';
+	};
 
     var isUUID = function(id) {
         var RE = /^(bk:)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -164,23 +169,12 @@ var parseTree = function(tree, config) {
         }
         child.ParentID = node.ID;
     };
-    var getType = function(type) {
-        var alias = config.alias;
-        if (!type) {
-            return '';
-        }
-        type = type.toLowerCase().trim();
-        if (alias[type]) {
-            type = alias[type];
-        }
-        return type;
-    }
     var getNearestParent = function(node) {
         var types = config.typeParents;
-        var nodeType = getType(node.Type);
+        var nodeType = node.Type;
         var rootFullID = node.fullID.split(';').shift();
         if (!rootFullID) {
-            tree.errors.push('Geen valide ID voor '+node._id+': '+node.ID+' '+node.Prefix+':'+node.Title+' ('+node.Type+')');
+            tree.errors.push(getExcelIndex(node)+'Geen valide ID voor '+node._id+': '+node.ID+' '+node.Prefix+':'+node.Title+' ('+node.Type+')');
         } else if (types[nodeType]) {
             for (var i=node._id-1; i>=0; i--) {
                 var p = tree.all[i];
@@ -188,7 +182,7 @@ var parseTree = function(tree, config) {
                 if (parentRootFullID != rootFullID) {
                     return null;
                 }
-                var pt = getType(p.Type);
+                var pt = p.Type;
                 if (types[nodeType].indexOf(pt)!==-1) {
                     return p;
                 }
@@ -209,18 +203,22 @@ var parseTree = function(tree, config) {
         }
         if (!parent && node.ParentID) {
             var parents = tree.ids[node.ParentID];
+			if (!parents) {
+				tree.errors.push(getExcelIndex(node)+'Missende Parent met ID '+node.ParentID+' bij '+node.ID+' '+node.Title);
+				return null;
+			}
             parents = parents.filter(function(parent) {
-                return parent.childID && parent.childID.indexOf(node._id)!==-1;
-            });
-            parent = parents[0]; // should only be one
+   	            return parent.childID && parent.childID.indexOf(node._id)!==-1;
+       	    });
+           	parent = parents[0]; // should only be one
         }
         if (!parent) {
             var parent = getNearestParent(node);
             if (parent) {
-                tree.errors.push('Missend ParentID voor '+getRootTitle(node)+':'+node.ID+' '+node.Prefix+':'+node.Title+'; dichtsbijzijnde parent is: '+parent.ID+' '+parent.Prefix+':'+parent.Title);
+                tree.errors.push(getExcelIndex(node)+'Missend ParentID voor '+getRootTitle(node)+':'+node.ID+' '+node.Prefix+':'+node.Title+'; dichtsbijzijnde parent is: '+parent.ID+' '+parent.Prefix+':'+parent.Title);
                 node.ParentID = parent.ID;
             } else if (node.Type!=config.topLevel) {
-                tree.errors.push('Missend ParentID voor '+getRootTitle(node)+':'+node.ID+' '+node.Type+' '+node.Title+'; could not find substitute;');
+                tree.errors.push(getExcelIndex(node)+'Missend ParentID voor '+getRootTitle(node)+':'+node.ID+' '+node.Type+' '+node.Title+'; could not find substitute;');
             }
         }
         return parent;
@@ -234,7 +232,7 @@ var parseTree = function(tree, config) {
 
     var getHash = function(node) {
         if (!node.Title) {
-            tree.errors.push('Missende titel voor '+getRootTitle(node)+':'+node.ID+' '+node.Type);
+            tree.errors.push(getExcelIndex(node)+'Missende titel voor '+getRootTitle(node)+':'+node.ID+' ('+node.Type+')');
         }
         if (!node.Prefix && !node.Title) {
             return false;
@@ -254,6 +252,9 @@ var parseTree = function(tree, config) {
     var getPrefix = function(node) {
         return node.Prefix ? node.Prefix + ': ' : '';
     };
+
+
+
 
     // attempt to build sensible ID's 
     // if the nodes are the same across sheets, they should reuse the same uuid
@@ -296,28 +297,41 @@ var parseTree = function(tree, config) {
         }
     });
 
-    // corrigeer types
-    tree.all.forEach(function(node) {
-        node.Type = getType(node.Type);
-//        if (node.Type.match(/leerdoel|leerdoel kern|leerdoel subkern/i)) {
-//            node.Type = 'doel';
-//        }
-    });
+
 
     // corrigeer missende parents
     tree.all.forEach(function(node) {
         var parent = getParent(node); //fixes it inside getParent() if needed
     });
 
+	var matchesHierarchy = function(node, parent) {
+		var nodeType = node.Type;
+		var parentType = parent.Type;
+		if (!config.hierarchy[nodeType]) {
+			return true;
+		}
+		var allowedParents = config.hierarchy[nodeType];
+		if (!Array.isArray(allowedParents)) {
+			allowedParents = [allowedParents];
+		}
+		if (allowedParents.indexOf(parentType)!==-1) {
+			return true;
+		}
+		return false;
+	}
+
     var hierarchyErrors = 0;
     var fixHierarchyByPrefix = function(node, prefixes, level) {
         var hierarchy = config.hierarchy;
         var parent = getParent(node);
+		if (!parent) {
+			return;
+		}
         var nodeType = node.Type;
         var parentType = parent.Type;
         var rootID = node.fullID.split(';').shift();
         var rootEntity = tree.fullIds[rootID];
-        if (hierarchy[nodeType] && hierarchy[nodeType]!=parentType) {
+        if (!matchesHierarchy(node, parent)) { //hierarchy[nodeType] && hierarchy[nodeType]!=parentType) {
             // find by prefix
             if (node.Prefix) {
                 var parentPrefix = node.Prefix.split('.');
@@ -344,22 +358,22 @@ var parseTree = function(tree, config) {
                             node.ParentID = newParent.ID;
                             removeChild(parent, node);
                             addChild(newParent, node);
-                            tree.fixes.push('ParentID moet worden aangepast voor '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' - verwachtte '+hierarchy[nodeType]+', kreeg '+parentType+', prefix parent was '+newParent.Type+': '+newParent.Prefix+': '+newParent.Title);
+                            tree.fixes.push(getExcelIndex(node)+'ParentID moet worden aangepast voor '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' - verwachtte '+hierarchy[nodeType]+', kreeg '+parentType+', prefix parent was '+newParent.Type+': '+newParent.Prefix+': '+newParent.Title);
                         } else {
                             hierarchyErrors++;
-                            tree.errors.push('ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
+                            tree.errors.push(getExcelIndex(node)+'ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
                         }
                     } else {
                         hierarchyErrors++;
-                        tree.errors.push('ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
+                        tree.errors.push(getExcelIndex(node)+'ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
                     }
                 } else {
                     hierarchyErrors++;
-                    tree.errors.push('ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
+                    tree.errors.push(getExcelIndex(node)+'ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
                 }
             } else {
                 hierarchyErrors++;
-                tree.errors.push('ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
+                tree.errors.push(getExcelIndex(node)+'ParentID fout in '+getRootTitle(node)+' '+level+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
             }
         }
     };
@@ -425,7 +439,7 @@ var parseTree = function(tree, config) {
                 }
             }
         }
-        tree.errors.push('Missend niveau(level) voor '+getRootTitle(node)+': '+node.ID+' '+getPrefix(node)+node.Title+' ('+node.Type+')');
+        tree.errors.push(getExcelIndex(node)+'Missend niveau(level) voor '+getRootTitle(node)+': '+node.ID+' '+getPrefix(node)+node.Title+' ('+node.Type+')');
 //                throw new Error('Niveau mist voor ',node);
     };
 
@@ -449,7 +463,7 @@ var parseTree = function(tree, config) {
 
     // vind alle kerndoelen en hang deze onder doelen
     tree.all.forEach(function(node) {
-        var nodeType = getType(node.Type);
+        var nodeType = node.Type;
         if (nodeType=='kerndoel') {
             var parent = getParent(node);
             if (parent && parent.type!='doelniveau') {
@@ -463,7 +477,7 @@ var parseTree = function(tree, config) {
                     doelniveau.childID.push(node._id);
                     var doel = tree.all[doelniveau.childID[0]];
                     if (parent.type!='doel') {
-                        tree.fixes.push('Kerndoel verplaatst '+getRootTitle(node)+': '+getPrefix(node)+node.Title+' naar doel '+doel.Title+' ('+reverseNiveaus[doelniveau.niveau_id]+')');
+                        tree.fixes.push(getExcelIndex(node)+'Kerndoel verplaatst '+getRootTitle(node)+': '+getPrefix(node)+node.Title+' naar doel '+doel.Title+' ('+reverseNiveaus[doelniveau.niveau_id]+')');
                     }
                     node.ParentID = doelniveau.ID;
                 });
@@ -471,25 +485,6 @@ var parseTree = function(tree, config) {
         }
     });
 
-    // filter rows weg die geen bekend type hebben
-    var types = config.types;
-    var removedCount = 0;
-    tree.all.forEach(function(node) {
-        var type = node.Type;
-        if (!types[type]) {
-            if (node.ParentID && tree.ids[node.ParentID]) {
-                tree.ids[node.ParentID].forEach(function(parent) {
-                    if (config.filterTypes[type]) {
-                        tree.fixes.push('Verwijderd volgens filterTypes lijst: '+getRootTitle(node)+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
-                        removeChild(parent, node);
-                        removedCount++;
-                    } else {
-                        tree.errors.push('Onbekend type: '+getRootTitle(node)+': '+getPrefix(node)+node.Title+' ('+node.Type+')');
-                    }
-                });
-            }
-        }
-    });
 
     //hershuffle ID's - alle entiteiten krijgen nieuwe ID's
     var isOBKID = function(id) {
@@ -504,7 +499,7 @@ var parseTree = function(tree, config) {
         }
         // make sure ID's for vak/vakkern/vaksubkern get reused
         if (typeof node.ID == 'undefined') {
-            tree.errors.push('Node mist ID: '+getRootTitle(node)+': '+node.Prefix+': '+node.Title+' ('+node.Type+')');
+            tree.errors.push(getExcelIndex(node)+'Node mist ID: '+getRootTitle(node)+': '+node.Prefix+': '+node.Title+' ('+node.Type+')');
             return;
         }
         if (node.Type!='kerndoel' && isOBKID(node.ID)) {// || !isUUID(node.ID)) {
@@ -530,7 +525,11 @@ var parseTree = function(tree, config) {
     });
 
     // vind alle andere nodes en maak daar entiteiten van (gecorrigeerd)
-    var entities = {
+	var entities = {};
+	Object.keys(config.types).forEach(function(type) {
+		entities[type] = [];
+	});
+/*    var entities = {
         ldk_vak: [],
         ldk_vakkern: [],
         ldk_vaksubkern: [],
@@ -539,6 +538,7 @@ var parseTree = function(tree, config) {
         doel: [],
         tag: []
     };
+*/
     var seen = {};
 
     var addChildEntities = function(nodeId) {
@@ -613,7 +613,7 @@ var parseTree = function(tree, config) {
                 entity[key] = entity[key].concat(newEntity[key]);
                 entity[key] = entity[key].filter(onlyUnique);
             } else if (entity[key] != newEntity[key]) {
-                tree.fixes.push('Verschil '+getRootTitle(node)+' in '+entity.id+': '+key+'<br>'+entity[key]+' <br>'+newEntity[key]+'<br>onderste verwijderd');
+                tree.fixes.push(getExcelIndex(node)+'Verschil '+getRootTitle(node)+' in '+entity.id+': '+key+'<br>'+entity[key]+' <br>'+newEntity[key]+'<br>onderste verwijderd');
                 differenceCount++;
             }
         });
@@ -653,10 +653,13 @@ var parseTree = function(tree, config) {
     var files = config.files;
     var fixes = '<div class="slo-alert slo-warning">'+tree.fixes.join('<br>')+'</div>';
     var errors = '<div class="slo-alert slo-errors">'+tree.errors.join('<br>')+'</div>';
+	if (!container) {
+		container = document.querySelector('ul.slo-list-root');
+	}
     if (tree.errors.length) {
-        document.querySelector('ul.slo-list-root').innerHTML = errors + fixes; 
+        container.innerHTML = errors + fixes; 
     } else {
         downloadZipFile(entities, files, 'entities.zip');
-        document.querySelector('ul.slo-list-root').innerHTML = fixes + importSheet.toHTML(tree);
+       	container.innerHTML = fixes + importSheet.toHTML(tree);
     }
 };
