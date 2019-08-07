@@ -27,13 +27,14 @@ var examenConfig = {
         // welke direct kinderen kunnen er in de boom staan
         typeChildren: {
             'examenprogramma': ['examenprogramma_vakleergebied','examenprogramma_domein','examenprogramma_kop1'],
-            'examenprogramma_domein': ['examenprogramma_subdomein'],
+            'examenprogramma_domein': ['examenprogramma_subdomein','examenprogramma_eindterm'],
             'examenprogramma_subdomein': ['examenprogramma_eindterm'],
             'examenprogramma_eindterm': ['niveau'],
 			'examenprogramma_kop1': ['examenprogramma_kop2','examenprogramma_body'],
 			'examenprogramma_kop2': ['examenprogramma_kop3','examenprogramma_body'],
 			'examenprogramma_kop3': ['examenprogramma_kop4','examenprogramma_body'],
-			'examenprogramma_kop4': ['examenprogramma_body']
+			'examenprogramma_kop4': ['examenprogramma_body'],
+			'examenprogramma_body': []
         },
         // wat is de directe parent van de inhouden types
         hierarchy: {
@@ -42,7 +43,11 @@ var examenConfig = {
             'examenprogramma_domein': 'examenprogramma',
             'examenprogramma_subdomein': 'examenprogramma_domein',
             'examenprogramma_eindterm': ['examenprogramma_subdomein','examenprogramma_domein'],
-			'examenprogramma_kop1': 'examenprogramma'
+			'examenprogramma_kop1': 'examenprogramma',
+			'examenprogramma_kop2': 'examenprogramma_kop1',
+			'examenprogramma_kop3': 'examenprogramma_kop2',
+			'examenprogramma_kop4': 'examenprogramma_kop3',
+			'examenprogramma_body': ['examenprogramma_kop1','examenprogramma_kop2','examenprogramma_kop3','examenprogramma_kop4']
         },
         // welke types zijn er in de context beschikbaar (entiteit types)
         types: {
