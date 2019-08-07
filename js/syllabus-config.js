@@ -1,10 +1,11 @@
-var examenConfig = {
+var syllabusConfig = {
         //Vertaal lijst van bron types naar entiteiten types
         alias: {
             'syllabus': 'syllabus',
             'specifieke eindterm': 'syllabus_specifieke_eindterm',
+            'specifieke einterm': 'syllabus_specifieke_eindterm',
             'toelichting': 'syllabus_toelichting',
-            'vakbegrip': 'syllabus_vakbegrip'
+            'vakbegrippen': 'syllabus_vakbegrip'
         },
         // welke directe parents kunnen er in de excel boom staan, dus niet de uiteindelijke context
         typeParents: {
@@ -18,6 +19,25 @@ var examenConfig = {
             'syllabus_specifieke_eindterm': [],
             'syllabus_toelichting': [],
             'syllabus_vakbegrip': [],
+        },
+        properties: {
+            'syllabus': {
+                'ce_se': 'CE; SE',
+                'ingangsdatum': 'Ingangsdatum',
+                'versie': 'Versie',
+                'url': 'URL syllabus',
+                'jaargang': 'Jaargangversie van de syllabus',
+                'status': 'Publicatiestatus'
+            },
+            'syllabus_specifieke_eindterm': {
+                'ce_se': 'CE; SE'
+            },
+            'syllabus_toelichting': {
+                'ce_se': 'CE; SE'
+            },
+            'syllabus_vakbegrip': {
+                'ce_se': 'CE; SE'
+            }
         },
         // wat is de directe parent van de inhouden types
         hierarchy: {
@@ -40,14 +60,14 @@ var examenConfig = {
         // welke types worden in welk json bestand opgeslagen
         files: {
             'syllabus': 'syllabus.json',
-            'syllabus_specifieke_eindterm': 'syllabus.specifieke_eindtermen.json',
-            'syllabus_toelichting': 'syllabus.toelichtingen.json',
-            'syllabus_vakbegrip': 'syllabus.vakbegrippen.json',
-			'tag':'tags.json'
+            'syllabus_specifieke_eindterm': 'specifieke_eindtermen.json',
+            'syllabus_toelichting': 'toelichtingen.json',
+            'syllabus_vakbegrip': 'vakbegrippen.json',
+            'tag':'tags.json'
         },
         // welke niveau's zijn er, dit moet eigenlijk uit de curriculum-doelen context opgehaald worden
         niveaus: {
-            'po': 'bk:512e4729-03a4-43a2-95ba-758071d1b725',
+            'po': '512e4729-03a4-43a2-95ba-758071d1b725',
             'ob vmbo bb': '50d3e467-28c8-4c42-a0fe-e0000819ba39',
             'ob vmbo gl': '01aede69-edcd-4352-97e8-e16cb5d0015e',
             'ob vmbo kb': '2c0dd3c9-4432-4f0a-b103-f3ea2f5c1fc8',
