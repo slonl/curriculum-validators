@@ -287,6 +287,7 @@
           <a href="#obk" class="mdl-layout__tab">OBK</a>
           <a href="#kerndoelen" class="mdl-layout__tab">Kerndoelen</a>
           <a href="#examenprogramma" class="mdl-layout__tab">Examenprogramma</a>
+          <a href="#syllabus" class="mdl-layout__tab">Syllabus</a>
           <a href="#colofon" class="mdl-layout__tab">Colofon</a>
         </div>
       </header>
@@ -592,6 +593,22 @@
             </div>            
           </section>
         </div>
+        <div class="mdl-layout__tab-panel mdl-slo-panel" id="syllabus">
+          <section class="mdl-grid">
+            <div class="mdl-cell mdl-cell--6-col">
+              <h4>Syllabus Invoer</h4>
+              <div class="mdl-grid">
+              	<span class="slo-errors" data-simply-field="errors"></span>
+                <div class="mdl-layout-spacer"></div>
+                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
+                <input class="slo-hidden" type="file" multiple data-simply-command="uploadSyllabusXLSX" accept=".xlsx"></label>
+              </div>
+            </div>
+            <div class="mdl-cell mdl-cell--6-col" id="syllabus_info">
+              <h4>Syllabus Structuur</h4>
+            </div>            
+          </section>
+        </div>
         <div class="mdl-layout__tab-panel mdl-slo-panel" id="niveaus">
           <section class="mdl-grid">
             <div class="mdl-cell mdl-cell--6-col">
@@ -673,6 +690,7 @@
     <script src="js/slo.js"></script>
     <script src="js/filesaver.js"></script>
     <script src="js/examenprogramma-config.js"></script>
+    <script src="js/syllabus-config.js"></script>
     <script src="js/niveau-config.js"></script>
     <script src="js/ldk-config.js"></script>
     <script src="js/import-sheet.js"></script>
