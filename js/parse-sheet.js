@@ -627,6 +627,9 @@ var parseTree = function(tree, config, container) {
             entity.title = node.Title;
             entity.description = node.Description;
         };
+        if (node.ExamenprogrammaID) {
+            entity.examenprogramma_id = [node.ExamenprogrammaID];
+        }
         if (node.Tags || node.tags) {
             addTags(node, entity);
         }
@@ -634,6 +637,15 @@ var parseTree = function(tree, config, container) {
             var childTypes = config.typeChildren[node.Type];
             childTypes.forEach(function(childType) {
                 entity[childType+'_id'] = getChildrenByType(node, childType);
+            });
+        }
+        if (config.properties && config.properties[node.Type]) {
+            var props = config.properties[node.Type];
+            Object.keys(props).forEach(function(prop) {
+                var col = props[prop];
+                if (node[col]) {
+                    entity[prop] = node[col];
+                }
             });
         }
         return entity;
