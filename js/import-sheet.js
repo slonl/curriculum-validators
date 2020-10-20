@@ -96,9 +96,12 @@ importSheet = (function() {
 
 
 		var counter = 0;
-        sheet.forEach(function(row, index) {			
+        sheet.forEach(function(row, index) {
             var node = new RowNode(row, counter);
 			node._sheet = sheet.fileName;
+			if (!node._sheet) {
+				debugger;
+			}
 			node._row = index+2; // excel begint bij row 1 (+1) en de titel row telt niet mee (+1)
 			node.Type = getType(node.Type);
 			if (!config.types[node.Type]) {

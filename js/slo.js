@@ -161,6 +161,9 @@
             uploadExamenXLSX: function(el, value) {
                 this.app.actions.uploadExamenXLSX(el);
             },
+            uploadExamenBGXLSX: function(el, value) {
+                this.app.actions.uploadExamenBGXLSX(el);
+            },
             uploadSyllabusXLSX: function(el, value) {
                 this.app.actions.uploadSyllabusXLSX(el);
             },
@@ -817,9 +820,83 @@ console.log('obk tree done');
                         // correct stuff that can only be done per tree/sheet
                         // change all ID/ParentID's that aren't UUID's to uuid, since these can be things like '1A', which may occur in multiple sheets
                         // corrigeer alle ID's en links naar ID's
+						var uuidMapping = {};
+						var counter = 0;
+						var seen = {};
+						tree.all.forEach(function(row) {
+							if (!isUUID(row.ID)) {
+								if (!row.ID) {
+									row.ID = 'missing_'+counter++;
+								}
+								if (!uuidMapping[row.ID]) {
+									uuidMapping[row.ID] = uuidv4();
+								}
+								var newID = uuidMapping[row.ID];
+								if (!seen[newID]) {
+									seen[newID] = row;
+								}
+								if (seen[newID] != row) {
+									tree.errors.push(row._sheet+':'+row._row+' bevat een al eerder gebruikte ID: "'+row.ID+'".');
+								}
+								row.ID = newID;
+							}
+							if (typeof row.ParentID!="undefined" && !isUUID(row.ParentID)) {
+								if (uuidMapping[row.ParentID]) {
+									row.ParentID = uuidMapping[row.ParentID];
+								}
+							}
+						});
                         return tree;
                     });
                     parseTree(tree, examenConfig, document.getElementById('examenprogramma_info'));
+                });
+            },
+            uploadExamenBGXLSX: function(upload) {
+                var processFile = function(file) {
+                    return new Promise(function(resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onload = function(e) {
+                            var data = e.target.result;
+                            var workbook = XLSX.read(data, {
+                                type: 'binary'
+                            });
+                            var sheets = {};
+                            workbook.SheetNames.forEach(function(sheetName) {
+                                sheets[sheetName] = XLSX.utils.sheet_to_row_object_array(
+                                    workbook.Sheets[sheetName]
+                                );
+                            });
+                            //finish(sheets);
+                            resolve(sheets);
+                        };
+                        reader.onerror = function(ex) {
+                            console.error(ex);
+                            reject(ex);
+                        };
+                        reader.readAsBinaryString(file);
+                    });
+                };
+                var files = Array.from(upload.files);
+                var sheets = [];
+                var processFiles = function() {
+                    var file = files.pop();
+                    if (file) {
+                        return processFile(file).then(function(sheet) {
+                            sheet.fileName = file.name;
+                            sheets.push(sheet);
+                            return processFiles();
+                        });
+                    }
+                    return sheets;
+                };
+                processFiles().then(function(sheets) {
+                    var tree = importSheet.importAll(sheets, examenBGConfig, function(tree) {
+                        // correct stuff that can only be done per tree/sheet
+                        // change all ID/ParentID's that aren't UUID's to uuid, since these can be things like '1A', which may occur in multiple sheets
+                        // corrigeer alle ID's en links naar ID's
+                        return tree;
+                    });
+                    parseTree(tree, examenBGConfig, document.getElementById('examenprogramma_bg_info'));
                 });
             },
             uploadSyllabusXLSX: function(upload) {
@@ -950,6 +1027,7 @@ console.log('obk tree done');
                     var file = files.pop();
                     if (file) {
                         return processFile(file).then(function(sheet) {
+                            sheet.fileName = file.name;
                             sheets.push(sheet);
                             return processFiles();
                         });
@@ -961,6 +1039,32 @@ console.log('obk tree done');
                         // correct stuff that can only be done per tree/sheet
                         // change all ID/ParentID's that aren't UUID's to uuid, since these can be things like '1A', which may occur in multiple sheets
                         // corrigeer alle ID's en links naar ID's
+						var uuidMapping = {};
+						var counter = 0;
+						var seen = {};
+						tree.all.forEach(function(row) {
+							if (!isUUID(row.ID)) {
+								if (!row.ID) {
+									row.ID = 'missing_'+counter++;
+								}
+								if (!uuidMapping[row.ID]) {
+									uuidMapping[row.ID] = uuidv4();
+								}
+								var newID = uuidMapping[row.ID];
+								if (!seen[newID]) {
+									seen[newID] = row;
+								}
+								if (seen[newID] != row) {
+									tree.errors.push(row._sheet+':'+row._row+' bevat een al eerder gebruikte ID: "'+row.ID+'".');
+								}
+								row.ID = newID;
+							}
+							if (typeof row.ParentID!="undefined" && !isUUID(row.ParentID)) {
+								if (uuidMapping[row.ParentID]) {
+									row.ParentID = uuidMapping[row.ParentID];
+								}
+							}
+						});
                         return tree;
                     });
                     parseTree(tree);

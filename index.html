@@ -1,703 +1,394 @@
 <!doctype html>
-<!--
-  Material Design Lite
-  Copyright 2015 Google Inc. All rights reserved.
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-      https://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License
--->
-<html lang="en" data-simply-path="/slo-curriculum/">
-  <head>
+<html>
+<head>
+    <title>Curriculum Importeer Tool</title>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-    <title data-simply-field="title">SLO Curriculum</title>
-
-    <!-- Add to homescreen for Chrome on Android -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <link rel="icon" sizes="192x192" href="img/android-desktop.png">
-
-    <!-- Add to homescreen for Safari on iOS -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="Material Design Lite">
-    <link rel="apple-touch-icon-precomposed" href="img/ios-desktop.png">
-
-    <!-- Tile icon for Win8 (144x144 + tile color) -->
-    <meta name="msapplication-TileImage" content="img/ms-touch-icon-144x144-precomposed.png">
-    <meta name="msapplication-TileColor" content="#3372DF">
-
-    <link rel="shortcut icon" href="img/favicon.png">
-
-    <!-- SEO: If your mobile URL is different from the desktop URL, add a canonical link to the desktop page https://developers.google.com/webmasters/smartphone-sites/feature-phones -->
-    <!--
-    <link rel="canonical" href="http://www.example.com/">
-    -->
-
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:regular,bold,italic,thin,light,bolditalic,black,medium&amp;lang=en">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.blue_grey-blue.min.css" />
-    <link rel="stylesheet" href="styles.css">
-    <style>
-      .slo-levels {
-      	font-size: 0.8em;
-      	line-height: 1.1em;
-      	display: inline-block;
-      	border-radius: 3px;
-      	background-color: #EEE;
-      	padding: 3px;
-      }
-      table.slo-table {
-        width: 100%;
-        table-layout: fixed;
-      }
-      .slo-hidden {
-        display: none;
-      }
-      .mdl-textfield {
-        width: 100%;
-      }
-      .slo-button {
-        padding-top: 1px;
-        margin-left: 1em;
-      }
-      .slo-button .material-icons {
-        margin-top: -4px;
-      }
-      .slo-button-fab {
-          margin-top: -16px;
-          margin-left: 16px;
-      }
-      .slo-form-field {
-        clear: both;
-      }
-      .slo-form-field select {
-        width: 200px;
-      }
-      .slo-form-icon {
-        float:left;
-        margin-right:16px;
-        font-size: 24px;
-        line-height: 36px;
-        margin-top: 16px;
-        color: #888;
-      }
-      .slo-label {
-        font-size: 12px;
-        color: rgb(96,125,139);
-        margin-top: 4px;
-      }
-      .mdl-radio {
-        width: 100px;
-        margin-top: 3px;
-      }
-      .slo-section {
-        display: none;
-      }
-      .slo-section.slo-visible,
-      .slo-section:target {
-        display: block;
-      }
-      .slo-section > .mdl-card__supporting-text {
-        width: auto;
-      }
-
-      .mdl-slo-panel {
-        min-height: 48vh;
-      }
-      .slo-id {
-        width: 65px;
-      }
-      .slo-medium-width {
-        width: 300px;
-      }
-      .slo-small-width {
-        width: 110px;
-      }
-      .slo-table td {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        cursor: pointer;
-      }
-      .slo-table .slo-actions {
-        opacity: 0;
-        transition: opacity 0.5s ease-in-out;
-      }
-      .slo-table tr:hover .slo-actions {
-        opacity: 1;
-      }
-      .slo-actions i:hover {
-        cursor: pointer;
-        color: red;
-      }
-      .slo-collapsed ul {
-        display: none;
-      }
-      .slo-list-root {
-        position: sticky;
-        top: 0px;
-        max-height: 100vh;
-        overflow: auto;
-      }
-      body.slo-dialog .slo-list-root {
-        max-height: calc(100vh - 420px);
-      }
-      .slo-list-root li {
-        cursor: pointer;
-      }
-      .slo-list-root li:not(.slo-collapsed) > span {
-        color: blue;
-        text-decoration: underline;
-      }
-      .slo-highlight {
-        background-color: #CCC;
-      }
-      @keyframes yellowfade {
-          from { background: yellow; }
-          to { background: transparent; }
-      }
-      .slo-yellow-fade {
-          animation-name: yellowfade;
-          animation-duration: 1.5s;
-      }
-      #editPanel {
-          position: fixed;
-          bottom: 0;
-          right: 0;
-          z-index: 100;
-          width: 50%;
-          height: 420px;
-          margin: 0;
-          left: auto;
-          box-sizing: border-box;
-          background: white;
-      }
-      dialog button.slo-close {
-          position: absolute;
-          right: 10px;
-      }
-      dialog.slo-dialog {
-          height: auto;
-          padding: 0;
-          border: 0;
-      }
-      dialog.slo-dialog > header {
-        box-shadow: 0 0 0;
-      }
-      .children .popup {
-      	display: none;
-        position: absolute;
-        top: 1em;
-        z-index: 100000000;
-        left: -400px;
-        background-color: white;
-        width: 390px;
-        box-shadow: 0px 0px 3px #CCC;
-        box-sizing: border-box;
-        font-size: 0.8em;
-      }
-      .children input:focus ~ .popup,
-      .children .popup:hover {
-      	display: block;
-      }
-      .children .child-id {
-		width: 100px;
-        overflow: hidden;
-		float: left;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .children .child-title {
-        float: right;
-        overflow: hidden;
-        max-width: 265px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-		color: #888;
-      }
-      .children .child {
-        position: relative;
-      	border-top: 1px solid #DDD;
-      	padding: 10px;
-      	overflow: hidden;
-      	clear: both;
-      }
-      .children .child:first-child {
-        border-top: 0px;
-      }
-      .child .child-delete {
-        display: none;
-      	left: 0;
-      	bottom: 0;
-      	color: #666;
-      }
-      .child:hover .child-delete {
-        display: block;
-      }
-      .slo-error {
-      	display: block;
-      	position: absolute;
-      	right: 10px;
-      	background-color: #CCC;
-      	color: red;
-      	border: 1px solid red;
-      	padding: 3px;
-      	border-radius: 3px;
-      	margin-top: -15px;
-      }
-      .slo-error:empty {
-      	display: none;
-      }
-      .slo-errors {
-      	color: red;
-      }
-      .slo-errors:not(:empty)::after {
-        content: ' fout(en)';
-      }
-      
-      #leerdoelen > .mdl-layout__container {
-      	position: static;
-      }
-    </style>
-  </head>
-  <body class="mdl-slo mdl-demo mdl-color--grey-100 mdl-color-text--grey-700 mdl-base">
-    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
-      <header class="mdl-layout__header mdl-layout__header--scroll mdl-color--primary">
-        <div class="mdl-layout--large-screen-only mdl-layout__header-row">
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.min.js"
+      integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+      crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="js/vanillaSelectBox.css">
+    <script src="js/vanillaSelectBox.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/extra.css">
+    <!-- script src="https://cdn.lr-ingest.io/LogRocket.min.js" crossorigin="anonymous"></script -->
+    <script>
+        window.LogRocket && window.LogRocket.init('muze/entiteiten-editor');
+    </script>
+</head>
+<body class="slo-main-page">
+    <header class="slo-navbar">
+        <nav class="slo-navbar-left slo-logo bg-brand-gradient">
+            <a href="/"><img src="/assets/img/slo.png"></a>
+        </nav>
+        <div class="slo-navbar-left">
+            OpenData Portal: Importeer Tool
         </div>
-        <div class="mdl-layout--large-screen-only mdl-layout__header-row">
-          <img class="slo-logo" src="img/logo.png" alt="SLO">
+        <div class="slo-navbar-right slo-profile">
+            <img class="slo-avatar" data-simply-field="user.avatar_url">
+            <div class="slo-username" data-simply-field="user.name"></div>
+            <a href="#" class="slo-logoff" data-simply-command="logoff">Afmelden</a>
         </div>
-        <div class="mdl-layout--large-screen-only mdl-layout__header-row">
+    </header>
+    <div class="slo-navbar slo-navbar-side bg-gray">
+        <div class="slo-space">
+            <p>
+                Aangepaste Entiteiten
+        <div data-simply-field="changeCount" data-simply-content="template" data-simply-default-template="default">
+            <template data-simply-template="0">
+                        <textarea disabled placeholder="Commit message" data-simply-field="commitMessage"></textarea>
+            </template>
+            <template data-simply-template="default">
+                <textarea placeholder="Commit message" data-simply-field="commitMessage"></textarea>
+            </template>
         </div>
-        <div class="mdl-layout__tab-bar mdl-js-ripple-effect mdl-color--primary-dark">
-          <a href="#overview" class="mdl-layout__tab is-active">Uitleg</a>
-          <a href="#leerdoelen" class="mdl-layout__tab">Leerdoelen</a>
-          <a href="#niveaus" class="mdl-layout__tab">Niveaus</a>
-          <a href="#obk" class="mdl-layout__tab">OBK</a>
-          <a href="#kerndoelen" class="mdl-layout__tab">Kerndoelen</a>
-          <a href="#examenprogramma" class="mdl-layout__tab">Examenprogramma</a>
-          <a href="#syllabus" class="mdl-layout__tab">Syllabus</a>
-          <a href="#colofon" class="mdl-layout__tab">Colofon</a>
+            </p>
+            <p>
+                <span data-simply-field="changeCount">0</span> aanpassingen
+        <div data-simply-field="changeCount" data-simply-content="template" data-simply-default-template="default">
+            <template data-simply-template="0">
+                        <button disabled class="slo-button slo-commit">Verwerken</button>
+            </template>
+            <template data-simply-template="default">
+                        <button data-simply-command="commit-changes" class="slo-button slo-commit">Verwerken</button>
+            </template>
         </div>
-      </header>
-      <main class="mdl-layout__content">
-        <div class="mdl-layout__tab-panel is-active mdl-slo-panel" id="overview">
-          <section class="section--center mdl-grid mdl-grid--no-spacing mdl-shadow--2dp">
-            <header class="section__play-btn mdl-cell mdl-cell--3-col-desktop mdl-cell--2-col-tablet mdl-cell--4-col-phone mdl-color--teal-100 mdl-color-text--white">
-              <i class="material-icons">play_circle_filled</i>
-            </header>
-            <div class="mdl-card mdl-cell mdl-cell--9-col-desktop mdl-cell--6-col-tablet mdl-cell--4-col-phone">
-              <div class="mdl-card__supporting-text">
-                <h4>Uitleg</h4>
-              </div>
-              <div class="mdl-card__actions">
-                <a href="#" class="mdl-button">meer uitleg</a>
-              </div>
-            </div>
-          </section>
-        </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="obk">
-          <section class="mdl-grid">
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>OBK Invoer</h4>
-              <div class="mdl-grid">
-              	<span class="slo-errors" data-simply-field="errors"></span>
-                <div class="mdl-layout-spacer"></div>
-                <button data-simply-command="downloadTree" data-simply-value="obk" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Download Boomstructuur</button>
-                &nbsp;&nbsp;&nbsp;
-                <button data-simply-command="downloadEntiteiten" data-simply-value="obk" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Export Entiteiten</button>
-                &nbsp;&nbsp;&nbsp;
-                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
-                <input class="slo-hidden" type="file" data-simply-command="uploadOBKXLSX" data-simply-value="obk" accept=".xlsx"></label>
-              </div>
-            </div>
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>OBK Structuur</h4>
-              <ul class="obk-list-root" data-simply-list="obk-structuur.children" data-simply-sortable>
-                <template rel="obk-structuur"></template>
-              </ul>
-              <template id="obk-structuur">
-                <li class="slo-collapsed" data-simply-field="id" data-slo-id="0"
-                  data-simply-content="attributes" data-simply-attributes="data-slo-id" 
-                  data-simply-command="showRow"
-                >
-                  <span data-simply-field="prefix">Prefix</span>
-                  <span data-simply-field="title">Titel</span>
-                  <ul data-simply-list="children" data-simply-sortable>
-                    <template rel="obk-structuur"></template>
-                  </ul>
-              </template>
-            </div>            
-          </section>
-        </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="kerndoelen">
-          <section class="mdl-grid">
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Kerndoelen Invoer</h4>
-              <div class="mdl-grid">
-                <span class="slo-errors" data-simply-field="errors"></span>
-                <div class="mdl-layout-spacer"></div>
-                <button data-simply-command="downloadTree" data-simply-value="kerndoelen" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Download Boomstructuur</button>
-                &nbsp;&nbsp;&nbsp;
-                <button data-simply-command="downloadEntiteiten" data-simply-value="kerndoelen" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Export Entiteiten</button>
-                &nbsp;&nbsp;&nbsp;
-                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
-                <input class="slo-hidden" type="file" data-simply-command="uploadKerndoelenXLSX" data-simply-value="obk" accept=".xlsx"></label>
-              </div>
-              <table id="kerndoelenTable" class="slo-table mdl-data-table mdl-js-data-table mdl-shadow--2dp">
-                <thead>
-                  <tr>
-                    <th class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col0">ID</th>
-                    <th class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col1">ParentID</th>
-                    <th class="slo-id mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col2">Prefix</th>
-                    <th class="slo-medium-width mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col3">Titel</th>
-                    <th class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col4">Omschrijving</th>
-                    <th class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col5">Type</th>
-                    <th class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="kerndoelen-headers.col6">Niveau</th>
-                    <th></th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody data-simply-list="kerndoelen">
-                  <template>
-                    <tr data-simply-command="toggleKDStruct" data-simply-value="0" 
-                    data-simply-field="ID" data-simply-content="attributes" data-simply-attributes="data-simply-value">
-                      <td class="slo-hidden mdl-data-table__cell--non-numeric slo-id" data-simply-field="ID"></td>
-                      <td class="slo-hidden mdl-data-table__cell--non-numeric slo-id" data-simply-field="ChildID"></td>
-                      <td class="slo-id mdl-data-table__cell--non-numeric" data-simply-field="Prefix"></td>
-                      <td class="slo-medium-width mdl-data-table__cell--non-numeric" data-simply-field="Title"></td>
-                      <td class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="Description"></td>
-                      <td class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="Type"></td>
-                      <td class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="Level"></td>
-                      <td><span class="slo-error" data-simply-field="error"></span></td>
-                      <td class="slo-actions">
-                        <button class="mdl-button mdl-js-button mdl-button--icon" data-simply-command="editKDRow">
-                          <i class="material-icons">edit</i>
+            </p>
+            <div class="slo-entiteit-changes" data-simply-list="changes">
+                <template>
+                    <div class="slo-entiteit-change">
+                        <button data-simply-command="delete-change" class="slo-button slo-right">
+                            <svg class="slo-icon slo-icon-feather">
+                                <use xlink:href="/files/feather-sprite.svg#trash">
+                                </use>
+                            </svg>
                         </button>
-                        <button class="mdl-button mdl-js-button mdl-button--icon" data-simply-command="delKDRow">
-                          <i class="material-icons">delete_forever</i>
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
+                        <input type="checkbox" checked data-simply-field="commit" value=1>
+                        <span class="slo-title" data-simply-field="title"></span><br>
+                        <span class="slo-type" data-simply-field="section"></span><br>
+                        <a href="#" class="slo-uuid" data-simply-field="id" data-simply-transformer="editlink"></a>
+                    </div>
+                </template>
             </div>
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Kerndoelen Structuur</h4>
-              <ul class="obk-list-root" data-simply-list="obk-structuur.children" data-simply-sortable>
-                <template rel="obk-structuur"></template>
-              </ul>
-              <template id="obk-structuur">
-                <li class="slo-collapsed" data-simply-field="id" data-slo-id="0"
-                  data-simply-content="attributes" data-simply-attributes="data-slo-id" 
-                  data-simply-command="showRow"
-                >
-                  <span data-simply-field="prefix">Prefix</span>
-                  <span data-simply-field="title">Titel</span>
-                  <ul data-simply-list="children" data-simply-sortable>
-                    <template rel="obk-structuur"></template>
-                  </ul>
-              </template>
-            </div>            
-          </section>
         </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="leerdoelen">
-          <section class="mdl-grid">
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Leerdoelen Invoer</h4>
-              <div class="mdl-grid">
-              	<span class="slo-errors" data-simply-field="errors"></span>
-                <div class="mdl-layout-spacer"></div>
-                <button data-simply-command="downloadEntiteiten" data-simply-value="leerdoelen" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Export Entiteiten</button>
-                &nbsp;&nbsp;&nbsp;
-                <button data-simply-command="downloadXLSX" data-simply-value="leerdoelenTable" 
-                	class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored"
-                >Download data</button>
-                &nbsp;&nbsp;&nbsp;
-                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
-                <input class="slo-hidden" type="file" multiple data-simply-command="uploadLD2XLSX" data-simply-value="leerdoelen" accept=".xlsx"></label>
-              </div>
-
-              <table id="leerdoelenTable" class="slo-table mdl-data-table mdl-js-data-table mdl-shadow--2dp">
-                <thead>
-                  <tr>
-                    <th class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col0">ID</th>
-                    <th class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col1">ParentID</th>
-                    <th class="slo-id mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col2">Prefix</th>
-                    <th class="slo-medium-width mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col3">Titel</th>
-                    <th class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col4">Omschrijving</th>
-                    <th class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col5">Type</th>
-                    <th class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="leerdoelen-headers.col6">Niveau</th>
-                    <th></th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody data-simply-list="leerdoelen">
-                  <template>
-                    <tr data-simply-command="toggleStruct" data-simply-value="0" 
-                    data-simply-field="ID" data-simply-content="attributes" data-simply-attributes="data-simply-value">
-                      <td class="slo-hidden mdl-data-table__cell--non-numeric slo-id" data-simply-field="ID"></td>
-                      <td class="slo-hidden mdl-data-table__cell--non-numeric slo-id" data-simply-field="ChildID"></td>
-                      <td class="slo-id mdl-data-table__cell--non-numeric" data-simply-field="Prefix"></td>
-                      <td class="slo-medium-width mdl-data-table__cell--non-numeric" data-simply-field="Title"></td>
-                      <td class="slo-hidden mdl-data-table__cell--non-numeric" data-simply-field="Description"></td>
-                      <td class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="Type"></td>
-                      <td class="slo-small-width mdl-data-table__cell--non-numeric" data-simply-field="Level"></td>
-                      <td><span class="slo-error" data-simply-field="error"></span></td>
-                      <td class="slo-actions">
-                        <button class="mdl-button mdl-js-button mdl-button--icon" data-simply-command="editRow">
-                          <i class="material-icons">edit</i>
-                        </button>
-                        <button class="mdl-button mdl-js-button mdl-button--icon" data-simply-command="delRow">
-                          <i class="material-icons">delete_forever</i>
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-              <br>
-              <button class="mdl-button mdl-js-button mdl-button--fab" data-simply-command="addRow">
-                <i class="material-icons">add</i>
-              </button>
-            </div>
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Leerdoelen Structuur</h4>
-              <ul class="slo-list-root" data-simply-list="leerdoelen-structuur.children" data-simply-sortable>
-                <template rel="leerdoelen-structuur"></template>
-              </ul>
-              <template id="leerdoelen-structuur">
-                <li class="slo-collapsed" data-simply-field="id" data-slo-id="0"
-                  data-simply-content="attributes" data-simply-attributes="data-slo-id" 
-                  data-simply-command="showRow"
-                >
-                  <span data-simply-field="prefix">Prefix</span>
-                  <span data-simply-field="title">Titel</span>
-                  <ul data-simply-list="children" data-simply-sortable>
-                    <template rel="leerdoelen-structuur"></template>
-                  </ul>
-              </template>
-             </div>            
-          </section>
-        <dialog class="slo-hidden slo-dialog mdl-layout mdl-js-layout mdl-layout--fixed-header mdl-shadow--2dp" id="editPanel">
-          <header class="mdl-layout__header">
-            <div class="mdl-layout__header-row">
-              <button class="mdl-button mdl-js-button mdl-button--icon" data-simply-command="prevRow" accesskey="p">
-                <i class="material-icons">arrow_left</i>
-              </button>
-              <span class="slo-row-count" data-simply-field="count.current"></span> / <span class="slo-row-count" data-simply-field="count.max"></span>
-              <button class="mdl-button mdl-js-button mdl-button--icon" data-simply-command="nextRow" accesskey="n">
-                <i class="material-icons">arrow_right</i>
-              </button>
-              <button class="slo-close mdl-button mdl-js-button mdl-button--icon" data-simply-command="close" accesskey="c">
-                <i class="material-icons">close</i>
-              </button>
-            </div>
-          </header>
-          <div class="mdl-layout__content">
-            <form data-simply-command="updateRow" class="mdl-grid" data-simply-collection="record">
-              <div class="mdl-cell mdl-cell--6-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" name="id" id="updateRow_id" data-simply-field="updateRow.ID" data-simply-element="id">
-                  <label class="mdl-textfield__label" for="updateRow_id">ID</label>
-                </div>
-              </div>
-              <div class="mdl-cell mdl-cell--5-col">
-                <div class="children mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" name="newChild" type="text" id="updateRow_children" list="all-ids">
-                  <label class="mdl-textfield__label" for="updateRow_children">Kinderen</label>
-                  <div class="popup" data-simply-list="updateRow.children">
-                  	<template>
-                  	  <div class="child">
-                  	  	<div class="child-id" data-simply-field="ID"></div>
-                  	  	<div class="child-title" data-simply-field="Title"></div>
-                  	  	<button class="child-delete mdl-button mdl-js-button mdl-button-icon" data-simply-command="delChild">
-							<i class="material-icons">delete_forever</i>
-						</button>
-                  	  </div>
-                  	</template>
-                  </div>
-                </div>
-              </div>
-		      <div class="mdl-cell mdl-cell--1-col">
-                <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--mini-fab" data-simply-command="addChild">
-                  <i class="material-icons">add</i>
-                </button>
-			  </div>
-              <div class="mdl-cell mdl-cell--2-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" id="updateRow_prefix" data-simply-field="updateRow.Prefix" data-simply-element="prefix">
-                  <label class="mdl-textfield__label" for="updateRow_prefix">Prefix</label>
-                </div>
-              </div>
-              <div class="mdl-cell mdl-cell--8-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" id="updateRow_title" data-simply-field="updateRow.Title" data-simply-element="title">
-                  <label class="mdl-textfield__label" for="updateRow_title">Titel</label>
-                </div>
-              </div>
-              <div class="mdl-cell mdl-cell--2-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" id="updateRow_tags" data-simply-field="updateRow.Tags" data-simply-element="tags">
-                  <label class="mdl-textfield__label" for="updateRow_tags">Tags</label>
-                </div>
-              </div>
-              <div class="mdl-cell mdl-cell--12-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" id="updateRow_description" data-simply-field="updateRow.Description" data-simply-element="description">
-                  <label class="mdl-textfield__label" for="updateRow_description">Omschrijving</label>
-                </div>
-              </div>
-              <div class="mdl-cell mdl-cell--6-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" id="updateRow_type" data-simply-field="updateRow.Type" data-simply-element="type">
-                  <label class="mdl-textfield__label" for="updateRow_type">Type</label>
-				  <span class="mdl-textfield__error">Kies: "vak","eindterm","vakkern","vaksubkern","vakinhoud","leerdoel kern","leerdoel subkern" of "kerndoel"</span>
-                </div>
-              </div>
-              <div class="mdl-cell mdl-cell--6-col">
-                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-                  <input class="mdl-textfield__input" type="text" id="updateRow_level" data-simply-field="updateRow.Level" data-simply-element="level">
-                  <label class="mdl-textfield__label" for="updateRow_level">Niveau</label>
-                </div>
-              </div>
-            </form>
-          </div>
-        </dialog>
-        </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="examenprogramma">
-          <section class="mdl-grid">
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Examenprogramma Invoer</h4>
-              <div class="mdl-grid">
-              	<span class="slo-errors" data-simply-field="errors"></span>
-                <div class="mdl-layout-spacer"></div>
-                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
-                <input class="slo-hidden" type="file" multiple data-simply-command="uploadExamenXLSX" accept=".xlsx"></label>
-              </div>
-            </div>
-            <div class="mdl-cell mdl-cell--6-col" id="examenprogramma_info">
-              <h4>Examenprogramma Structuur</h4>
-            </div>            
-          </section>
-        </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="syllabus">
-          <section class="mdl-grid">
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Syllabus Invoer</h4>
-              <div class="mdl-grid">
-              	<span class="slo-errors" data-simply-field="errors"></span>
-                <div class="mdl-layout-spacer"></div>
-                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
-                <input class="slo-hidden" type="file" multiple data-simply-command="uploadSyllabusXLSX" accept=".xlsx"></label>
-              </div>
-            </div>
-            <div class="mdl-cell mdl-cell--6-col" id="syllabus_info">
-              <h4>Syllabus Structuur</h4>
-            </div>            
-          </section>
-        </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="niveaus">
-          <section class="mdl-grid">
-            <div class="mdl-cell mdl-cell--6-col">
-              <h4>Niveau Invoer</h4>
-              <div class="mdl-grid">
-              	<span class="slo-errors" data-simply-field="errors"></span>
-                <div class="mdl-layout-spacer"></div>
-                <label class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--colored">Upload data
-                <input class="slo-hidden" type="file" multiple data-simply-command="uploadNiveauXLSX" accept=".xlsx"></label>
-              </div>
-            </div>
-            <div class="mdl-cell mdl-cell--6-col" id="niveau_info">
-              <h4>Niveau Structuur</h4>
-            </div>            
-          </section>
-        </div>
-        <div class="mdl-layout__tab-panel mdl-slo-panel" id="colofon">
-          <section class="section--center mdl-grid mdl-grid--no-spacing mdl-shadow--2dp">
-            <header class="section__play-btn mdl-cell mdl-cell--3-col-desktop mdl-cell--2-col-tablet mdl-cell--4-col-phone mdl-color--teal-100 mdl-color-text--white">
-              <i class="material-icons">play_circle_filled</i>
-            </header>
-            <div class="mdl-card mdl-cell mdl-cell--9-col-desktop mdl-cell--6-col-tablet mdl-cell--4-col-phone">
-              <div class="mdl-card__supporting-text">
-                <h4>Colofon</h4>
-              </div>
-            </div>
-          </section>
-        </div>
-        <footer class="mdl-mega-footer">
-          <div class="mdl-mega-footer--middle-section">
-            <div class="mdl-mega-footer--drop-down-section">
-              <input class="mdl-mega-footer--heading-checkbox" type="checkbox" checked>
-              <h1 class="mdl-mega-footer--heading">Features</h1>
-              <ul class="mdl-mega-footer--link-list">
-                <li><a href="#">Over</a></li>
-                <li><a href="#">Voorwaarden</a></li>
-                <li><a href="#">Partners</a></li>
-                <li><a href="#">Nieuws</a></li>
-              </ul>
-            </div>
-            <div class="mdl-mega-footer--drop-down-section">
-              <input class="mdl-mega-footer--heading-checkbox" type="checkbox" checked>
-              <h1 class="mdl-mega-footer--heading">Details</h1>
-              <ul class="mdl-mega-footer--link-list">
-                <li><a href="#">Specificatie</a></li>
-                <li><a href="#">API Documentatie</a></li>
-                <li><a href="#">Resources</a></li>
-              </ul>
-            </div>
-            <div class="mdl-mega-footer--drop-down-section">
-              <input class="mdl-mega-footer--heading-checkbox" type="checkbox" checked>
-              <h1 class="mdl-mega-footer--heading">Technologie</h1>
-              <ul class="mdl-mega-footer--link-list">
-                <li><a href="#">Inleiding</a></li>
-                <li><a href="#">Patronen</a></li>
-                <li><a href="#">Gebruii</a></li>
-                <li><a href="#">Producten</a></li>
-              </ul>
-            </div>
-            <div class="mdl-mega-footer--drop-down-section">
-              <input class="mdl-mega-footer--heading-checkbox" type="checkbox" checked>
-              <h1 class="mdl-mega-footer--heading">SLO</h1>
-              <ul class="mdl-mega-footer--link-list">
-                <li><a href="#">Contact</a></li>
-              </ul>
-            </div>
-          </div>
-        </footer>
-     </main>
     </div>
-    <datalist id="all-ids" data-simply-list="leerdoelen-ids">
-    	<template>
-    		<option data-simply-field="option"></option>
-    	</template>
-    </datalist>
-    <script src="https://code.getmdl.io/1.3.0/material.min.js"></script>
-    <script src="https://cdn.simplyedit.io/1/simply-edit.js" data-api-key="muze" data-simply-storage="ariadne" data-simply-endpoint="."></script>
-    <script src="js/simply/simply.everything.js"></script>
-    <script src="js/slo.js"></script>
-    <script src="js/filesaver.js"></script>
-    <script src="js/examenprogramma-config.js"></script>
-    <script src="js/syllabus-config.js"></script>
-    <script src="js/niveau-config.js"></script>
-    <script src="js/ldk-config.js"></script>
-    <script src="js/import-sheet.js"></script>
-    <script src="js/parse-sheet.js"></script>
-    <script src="node_modules/jszip/dist/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/jszip.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/xlsx.js"></script>
+    <main class="slo-main slo-space-vertical" data-simply-field="page" data-simply-content="template" data-simply-default-value="upload">
+    	<template data-simply-template="upload">
+            <div class="slo-space">
+            	<p>Kies de juiste context en upload een excel bestand met nieuwe data</p>
+                <form data-simply-command="uploadXLSX" class="slo-grid slo-grid-3" data-simply-collection="upload">
+					<select name="context" data-simply-element="context">
+						<option>curriculum-basis</option>
+						<option>curriculum-lpib</option>
+						<option>curriculum-kerndoelen</option>
+						<option>curriculum-examenprogramma</option>
+						<option>curriculum-examenprogramma-bg</option>
+						<option>curriculum-syllabus</option>
+						<option>curriculum-leerdoelenkaarten</option>
+					</select>
+					<label class="slo-button">
+						<span class="slo-label" data-simply-field="selected-files">Selecteer bestanden</span>
+		                <input class="slo-hidden" type="file" name="files" multiple="multiple" data-simply-element="files" accept=".xlsx">
+		            </label>
+		            <button class="slo-button" type="submit">Upload</button>
+                </form>
+                <div class="slo-grid slo-grid-2 slo-space">
+                </div>
+            </div>
+        </template>
+    </main>
 
-  </body>
+    <dialog id="login" class="slo-login">
+        <header class="bg-brand">
+            <img src="/assets/img/slo.png" class="slo-logo">
+        </header>
+        <section class="body">
+            <div class="slo-warning" data-simply-field="login-error"></div>
+            <div class="slo-warning">Aanmelden met uw Github account</div>
+            <form data-simply-command="login" method="POST">
+                <div class="group">
+                    <label>
+                        Naam
+                        <input type="text" name="username" id="username" data-simply-field="username" data-simply-element="username">
+                    </label>
+                </div>
+                <div class="group">
+                    <label>
+                        Wachtwoord
+                        <input type="password" name="password" data-simply-field="password" data-simply-element="password">
+                    </label>
+                </div>
+                <div class="group">
+                    <label>
+                        <input type="checkbox" name="savelogin" value="1" data-simply-field="savelogin" data-simply-element="savelogin">
+                        Bewaar mijn logingegevens op deze computer
+                    </label>
+                </div>
+                <br>
+                <button type="submit" class="slo-button slo-button-primary">Login
+                    <div class="ripples buttonRipples"><span class="ripplesCircle"></span></div>
+                </button>
+            </form>
+        </section>
+    </dialog>
+    
+    <div class="slo-dialog-overlay"></div>
+
+
+<script src="https://canary.simplyedit.io/1/simply-edit.js" xsrc="https://yvo.muze.nl/simply-edit/js/simply-edit.js" xsrc="https://cdn.simplyedit.io/1/simply-edit.js" data-simply-storage="none"></script>
+<script src="js/GitHub.bundle.js"></script>
+<script src="/js/simply/simply.everything.js"></script>
+<script>
+    simply.route.init({
+        root: '/importeer-tool/'
+    });
+
+	window.repos = {
+        'curriculum-lpib': 'slonl/curriculum-lpib',
+        'curriculum-basis': 'slonl/curriculum-basis',
+        'curriculum-kerndoelen': 'slonl/curriculum-kerndoelen',
+        'curriculum-examenprogramma': 'slonl/curriculum-examenprogramma',
+        'curriculum-examenprogramma-bg': 'slonl/curriculum-examenprogramma-bg',
+        'curriculum-syllabus': 'slonl/curriculum-syllabus',
+        'curriculum-doelgroepteksten': 'slonl/curriculum-doelgroepteksten',
+        'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten'
+    };
+	
+</script>
+
+<script src="https://unpkg.com/json-schema-ref-parser@6.0.0/dist/ref-parser.min.js"></script>
+<script src="https://unpkg.com/lodash@4.17.11/lodash.min.js"></script>
+<script src="js/curriculum.js"></script>
+<script src="js/importer.js"></script>
+<script>
+
+    editor.transformers = {
+        "round" : {
+            "render" : function(data) {
+                return Math.round(100 * (1-data),2) + "%";
+            }
+        },
+        "opendatalink" : {
+            "render" : function(data) {
+                this._data = data;
+                data = "https://opendata.slo.nl/curriculum/api-acpt/v1/uuid/"+data;
+                return data;
+            },
+            "extract": function() {
+                return this._data;
+            }
+        },
+        "editlink" : {
+            "render" : function(data) {
+                return {
+                    innerHTML : data,
+                    href : document.location.pathname + "#edit/" + data
+                };
+            },
+            "extract" : function(el) {
+                return el.innerHTML;
+            }
+        },
+        "uuid": {
+            "render": function(data) {
+                this.id = data;
+                return data;
+            }
+        },
+        "idToTitle": {
+            "render" : function(data) {
+                this.sloId = data;
+                var entity = clone(curriculum.index.id[data]);
+                if (curriculum.index.type[data] == "doelniveau") {
+                    if (entity.doel_id && entity.doel_id[0]) {
+                        var doel = clone(curriculum.index.id[entity.doel_id[0]]);
+                    } else if (entity.kerndoel_id && entity.kerndoel_id[0]) {
+                        var doel = clone(curriculum.index.id[entity.kerndoel_id[0]]);
+                    }
+                    if (entity.niveau_id && entity.niveau_id[0]) {
+                        var niveau = clone(curriculum.index.id[entity.niveau_id[0]]);
+                    }
+                    var result = '';
+                    if (niveau && niveau.title ) {
+                        result += '['+niveau.title+'] ';
+                    } else {
+                        result += '[geen niveau]';
+                    }
+                    if (doel && doel.title) {
+                        result += doel.title;
+                    } else {
+                        result += 'geen doel';
+                    }
+                    return result;
+                } else {
+                    if (typeof curriculum.index.id[data] == 'undefined') {
+                        return 'missing';
+                    }
+                    return curriculum.index.id[data].title ? clone(curriculum.index.id[data].title) : "";
+                }
+            },
+            "extract" : function(el) {
+                return this.sloId;
+            }
+        },
+        "hasDescription" : {
+            render : function(data) {
+                return (typeof data.description !== "undefined");
+            }
+        },
+        "hasTitle" : {
+            render : function(data) {
+                return (typeof data.title !== "undefined");
+            }
+        },
+        "isarray" : {
+            render : function(data) {
+                this.data = data;
+                return Array.isArray(data);
+            },
+            extract : function(el) {
+                return this.data;
+            }
+        },
+        "searchoption" : {
+            render : function(entity) {
+                entity = clone(entity);
+                this.data = entity;
+                var option = entity.title + " " + entity.id;
+
+                if (curriculum.index.type[entity.id]=="doelniveau") {
+                    var doel = clone(curriculum.index.id[entity.doel_id[0]]);
+                    var niveau = clone(curriculum.index.id[entity.niveau_id[0]]);
+                    option = "[" + niveau.title + "] " + doel.title + " " + entity.id;
+                }
+
+                return {
+                    innerHTML : option,
+                    value : entity.id
+                };
+            },
+            extract : function(el) {
+                return this.data;
+            }
+        }
+    };
+
+	simply.collect.addListener('upload', function(elements) { 
+		var files = elements.files.files;
+		switch(files.length) {
+			case 0:
+				editor.pageData['selected-files'] = 'Selecteer bestanden';
+			break;
+			case 1:
+				editor.pageData['selected-files'] = '1 bestand';
+			break;
+			default:
+				editor.pageData['selected-files'] = files.length+' bestanden';
+			break;
+		}
+	});
+
+
+
+	function escapeQuotes(s) {
+		return s.replace('"','\x22').replace("'",'\x27');
+	}
+	
+	function getDoelNiveauTitle(entity) {
+		if (!entity.niveau_id || !Array.isArray(entity.niveau_id) || !entity.niveau_id.length) {
+			var niveau = 'geen';
+		} else {
+			var niveau = entity.niveau_id.map(function(id) {
+				return  curriculum.index.id[id].title;
+			}).join(',');
+		}
+		var title = [];
+		['doel_id','kerndoel_id','examenprogramma_eindterm_id','examenprogramma_subdomein_id','examenprogramma_domeid_id'].forEach(function(prop) {
+			if (entity[prop] && Array.isArray(entity[prop]) && entity[prop].length) {
+				entity[prop].forEach(function(childId) {
+					title.push(prop.substr(0,prop.length-3)+': '+curriculum.index.id[childId].title);
+				});
+			}
+		});
+		return '('+niveau+') '+'['+(title.length)+'] '+title.join(',');
+	}
+	
+    (function() {
+        var login;
+        var loginString = localStorage.getItem('login');
+        if (loginString) {
+            try {
+                login = JSON.parse(loginString);
+            } catch(e) {
+            }
+        }
+        if (login) {
+            importTool.actions.autologin(login.username, login.password);
+        } else {
+            importTool.actions.showLogin();
+        }
+    })();
+    
+    function clone(ob) {
+        if (typeof ob == 'undefined' || ob == null) {
+            return null;
+        }
+        return JSON.parse(JSON.stringify(ob));
+    }
+
+
+    // Yucky code, but chrome handles large datalists very poorly. This is to make it only do autocompletion
+    // when enough characters have been entered. Firefox doesn't even break a sweat with this;
+    if (window.chrome) {
+        document.addEventListener("input", function(evt) {
+            if (evt.target.hasAttribute("list") && !evt.target.hasAttribute("data-list")) {
+                evt.target.setAttribute("data-list", evt.target.getAttribute("list"));
+            }
+            if (evt.target.getAttribute("data-list")) {
+                if (evt.target.value.length > 3) {
+                    evt.target.setAttribute("list", evt.target.getAttribute("data-list"));
+                } else {
+                    evt.target.removeAttribute("list");
+                }
+            }
+        }, true);
+    }
+
+
+    simply.activate.addListener('autosize', function() {
+        var self = this;
+        self.style.height = 'auto';
+        self.style.height = (self.scrollHeight+2)+'px';
+           this.addEventListener('input',function(evt) {
+            window.setTimeout(function() {
+                self.style.height = 'auto';
+                self.style.height = (self.scrollHeight+2)+'px';
+            },0);
+        });
+    });
+
+    /* Code to remember scroll position when the lists are changed and redrawn */
+    function rememberScrollPosition() {
+        window.scrollPosition = {
+            y: window.scrollY,
+            x: window.scrollX
+        };
+    }
+    window.addEventListener("databind:elementresolved", function(evt) {
+        window.setTimeout(function() {
+            delete window.scrollPosition;
+        }, 200);
+    });
+
+    window.addEventListener("scroll", function(evt) {
+        if (typeof window.scrollPosition !== "undefined") {
+            window.scrollTo(window.scrollPosition.x, window.scrollPosition.y);
+        }
+    });
+</script>
+<script src="js/tree.js"></script>
+<script src="node_modules/jszip/dist/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/jszip.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/xlsx.js"></script>
+</body>
 </html>

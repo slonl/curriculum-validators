@@ -27,7 +27,7 @@ var parseTree = function(tree, config, container) {
             'ldk_vakkern': ['ldk_vaksubkern','doelniveau','vakkern'],
             'ldk_vaksubkern': ['ldk_vakinhoud','doelniveau','vaksubkern'],
             'ldk_vakinhoud': ['doelniveau','vakinhoud'],
-            'doelniveau': ['doel','kerndoel','niveau']
+            'doelniveau': ['doel','kerndoel']
         },
         // wat is de directe parent van de inhouden types
         hierarchy: {
@@ -154,10 +154,13 @@ var parseTree = function(tree, config, container) {
     };
 
     var removeChild = function(node, child) {
+        child.ParentID = null;
+		if (!node || !node.childID) {
+			return;
+		}
         node.childID = node.childID.filter(function(childId) {
             return childId!=child._id;
         });
-        child.ParentID = null;
     };
 
     var addChild = function(node, child) {
@@ -240,13 +243,24 @@ var parseTree = function(tree, config, container) {
         return node.Prefix+':'+node.Title;
     };
 
-    var getRootTitle = function(node) {
+    var getRoot = function(node) {
         var rootFullID = node.fullID.split(';').shift();
-        var root = tree.fullIds[rootFullID];
+        return tree.fullIds[rootFullID];
+    };
+
+    var getRootTitle = function(node) {
+        var root = getRoot(node);
         if (root) {
             return root.Title;
         }
         return '(Onbekend)';
+    };
+
+    var getRootNiveau = function(node) {
+        var root = getRoot(node);
+        if (root.Level) {
+            return root.Level;
+        }
     };
 
     var getPrefix = function(node) {
@@ -427,42 +441,62 @@ var parseTree = function(tree, config, container) {
         return doelniveau;
     };
 
+	var getSheetRootNiveau = function(node) {
+		var rootID = tree.childID.filter(function(rootID) {
+			return tree.all[rootID]._sheet == node._sheet;
+		}).pop();
+		if (rootID || rootID===0) {
+			return tree.all[rootID].Level;
+		}
+		return null;
+	}
+
     // vind alle doelen en maak daar doelniveau's van, als ze die nog niet als parent hebben
     var getNiveau = function(level, node) {
         if (config.niveaus[level]) {
             return config.niveaus[level];
-        } else {
-            for (var i=node._id; i>=0; i--) {
-                var level = tree.all[i].Level;
-                if (level && config.niveaus[level]) {
-                    return config.niveaus[level];
-                }
-            }
         }
-        tree.errors.push(getExcelIndex(node)+'Missend niveau(level) voor '+getRootTitle(node)+': '+node.ID+' '+getPrefix(node)+node.Title+' ('+node.Type+')');
+        var niveau = getSheetRootNiveau(node);
+        if (!niveau) {
+            tree.errors.push(getExcelIndex(node)+'Missend niveau(level) voor '+getRootTitle(node)+': '+node.ID+' '+getPrefix(node)+node.Title+' ('+node.Type+')');
 //                throw new Error('Niveau mist voor ',node);
+        } else {
+            return niveau;
+        }
     };
 
-
+	if (!config.doelTypes) {
+        if (config.doelType) {
+            config.doelTypes = [config.doelType];
+        } else {
+    		config.doelTypes = ['doel','kerndoel'];
+        }
+	}
     tree.all.forEach(function(node) {
-        if (node.Type=='doel') {
+        if (config.doelTypes.includes(node.Type)) {
             var parent = getParent(node);
             if (parent && parent.Type!='doelniveau') {
                 removeChild(parent, node);
                 if (!node.Level) {
                     node.Level = getNiveau('',node); // get default level
                 }
-                node.Level.split(',').forEach(function(level) {
-                    var niveau = getNiveau(level.trim(),node);
-                    var doelniveau = getDoelNiveau(niveau, [node._id]); //FIXME: hier lijkt alleen het laatste niveau uit te komen
-                    parent.childID.push(doelniveau._id);
-                });
-            }
-        }
+				if (node.Level) {
+                    node.Level.split(',').forEach(function(level) {
+                        var niveau = getNiveau(level.trim(),node);
+                        var doelniveau = getDoelNiveau(niveau, [node._id]); //FIXME: hier lijkt alleen het laatste niveau uit te komen
+    					if (!parent.childID) {
+    						parent.childID = [];
+    					}
+                        parent.childID.push(doelniveau._id);
+                    });
+                }
+            }			
+		}
     });
 
     // vind alle kerndoelen en hang deze onder doelen
-    tree.all.forEach(function(node) {
+    //FIXME: kerndoelen mogen via doelniveau direct onder vak/vakkern/vaksubkern hangen, dus niet onder een doel verplaatsen
+/*    tree.all.forEach(function(node) {
         var nodeType = node.Type;
         if (nodeType=='kerndoel') {
             var parent = getParent(node);
@@ -484,6 +518,7 @@ var parseTree = function(tree, config, container) {
             }
         }
     });
+*/
 
 
     //hershuffle ID's - alle entiteiten krijgen nieuwe ID's
@@ -492,9 +527,12 @@ var parseTree = function(tree, config, container) {
     };
     var replacements = {};
     tree.all.forEach(function(node) {
-        if (isOBKID(node.ID)) {
+        if (isUUID(node.ID)) {
             if (config.links[node.Type]) {
-                node[config.links[node.Type]] = node.ID;
+                node[config.links[node.Type]] = [node.ID];
+                if (!isOBKID(node.ID)) {
+                    node.ID = "bk:" + node.ID;
+                }
             }
         }
         // make sure ID's for vak/vakkern/vaksubkern get reused
@@ -526,9 +564,7 @@ var parseTree = function(tree, config, container) {
 
     // vind alle andere nodes en maak daar entiteiten van (gecorrigeerd)
 	var entities = {};
-	Object.keys(config.types).forEach(function(type) {
-		entities[type] = [];
-	});
+	
 /*    var entities = {
         ldk_vak: [],
         ldk_vakkern: [],
@@ -560,6 +596,14 @@ var parseTree = function(tree, config, container) {
         }
     };
     var getChildrenByType = function(node, type) {
+		if (type=='niveau') {
+            if (!node.Level) {
+                return [];
+            }
+			return node.Level.split(',').map(function(level) {
+				return getNiveau(level.trim(),node);
+			});
+		}
         if (!node.childID) {
             return [];
         }
@@ -613,7 +657,12 @@ var parseTree = function(tree, config, container) {
                 entity[key] = entity[key].concat(newEntity[key]);
                 entity[key] = entity[key].filter(onlyUnique);
             } else if (entity[key] != newEntity[key]) {
-                tree.fixes.push(getExcelIndex(node)+'Verschil '+getRootTitle(node)+' in '+entity.id+': '+key+'<br>'+entity[key]+' <br>'+newEntity[key]+'<br>onderste verwijderd');
+				var message = getExcelIndex(node)+'Verschil '+getRootTitle(node)+' in '+entity.id+': '+key+'<br>'+entity[key]+' <br>'+newEntity[key];
+				if (key!='type' && key!='Type') { //['title','description','level'].indexOf(key)!=-1) {
+	                tree.fixes.push(message+'<br>onderste verwijderd');
+				} else {
+					tree.errors.push(message);
+				}
                 differenceCount++;
             }
         });
@@ -626,7 +675,9 @@ var parseTree = function(tree, config, container) {
             entity.prefix = node.Prefix;
             entity.title = node.Title;
             entity.description = node.Description;
-        };
+		} else if (node.niveau_id) {
+			entity.niveau_id = node.niveau_id
+		}
         if (node.ExamenprogrammaID) {
             entity.examenprogramma_id = [node.ExamenprogrammaID];
         }
@@ -650,7 +701,7 @@ var parseTree = function(tree, config, container) {
         }
         return entity;
     }
-    tree.childID.forEach(addChildEntities);
+
 
     var downloadZipFile = function(data, fileNames, zipName) {
         var zip = new JSZip();
@@ -662,16 +713,33 @@ var parseTree = function(tree, config, container) {
             saveAs(content, zipName);
         });
     };
-    var files = config.files;
-    var fixes = '<div class="slo-alert slo-warning">'+tree.fixes.join('<br>')+'</div>';
-    var errors = '<div class="slo-alert slo-errors">'+tree.errors.join('<br>')+'</div>';
-	if (!container) {
-		container = document.querySelector('ul.slo-list-root');
-	}
-    if (tree.errors.length) {
-        container.innerHTML = errors + fixes; 
-    } else {
-        downloadZipFile(entities, files, 'entities.zip');
-       	container.innerHTML = fixes + importSheet.toHTML(tree);
-    }
+
+	Object.keys(config.types).forEach(function(type) {
+		entities[type] = [];
+	});
+
+	fetch('https://raw.githubusercontent.com/slonl/curriculum-doelen/editor/data/tags.json')
+	.then(function(response) {
+		return response.json();
+	})
+	.then(function(json) {
+		entities.tag = json;
+	    tree.childID.forEach(addChildEntities);
+	    var files = config.files;
+	    var fixes = '<div class="slo-alert slo-warning">'+tree.fixes.join('<br>')+'</div>';
+	    var errors = '<div class="slo-alert slo-errors">'+tree.errors.join('<br>')+'</div>';
+		if (!container) {
+			container = document.querySelector('ul.slo-list-root');
+		}
+	    if (tree.errors.length) {
+	        container.innerHTML = errors + fixes; 
+	    } else {
+			downloadZipFile(entities, files, 'entities.zip');
+			container.innerHTML = fixes + importSheet.toHTML(tree);
+		}
+		window.debugTree = tree;
+	})
+	.catch(function(error) {
+		alert(error);
+	});
 };
