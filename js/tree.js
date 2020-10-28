@@ -44,8 +44,27 @@
 		});
 	}
 
+	function Entity() {
+		this._rows = [];
+		this.children = [];
+		this.parents = [];
+	}
+
 	function getExcelIndex(node) {
 		return '['+node._tree.fileName+':'+node._row+']';
+	}
+
+	function getTitle(node) {
+		return node.Prefix ? node.Prefix+': '+node.Title : node.Title;
+	}
+
+	var defaultProps = ['_row','ID','Prefix','Title'];
+	function Error(file, error, node=null, rows=null, props=[]) {
+		this.file = file;
+		this.error = error;
+		this.props = defaultProps.concat(props);
+		this.node = node;
+		this.rows = rows;
 	}
 
 	var tree = {
@@ -58,7 +77,7 @@
 						return { name: file.name, data: e.target.result};
 					})
 					.catch(function(error) {
-						errors.push({'file': file.name,'error': error});
+						errors.push(new Error(file.name, error));
 					});
 				}
 			))
@@ -97,8 +116,6 @@
 			})
 			.then(function(combinedSheets) {
 				// build trees
-				// assume contexts have been loaded
-				var schema = curriculum.schemas[context];
 				var trees = combinedSheets.map(function(sheet) {
 					return tree.buildFromArray(sheet, sheet.fileName);
 				});
@@ -106,6 +123,20 @@
 			})
 			.then(function(trees) {
 				console.log(trees);
+				var errors = [];
+				trees.forEach(function(tree) {
+					if (tree.errors) {
+						errors = errors.concat(tree.errors);
+					}
+				});
+				console.log(errors);
+				editor.pageData.errors = errors;
+				return;
+				// assume contexts have been loaded
+				var schema = curriculum.schemas[context];
+				var jsonSets = trees.map(function(myTree) {
+					return tree.convertToJSONSchema(myTree, schema);
+				});
 			});
 		},
 		buildFromArray: function(data, filename='') {
@@ -136,14 +167,84 @@
 					myTree.roots.push(node);
 				} else {
 					if (!myTree.ids[parentID]) {
-						myTree.errors.push(getExcelIndex(node)+' Missende Parent, parentID '+parentID);
+						myTree.errors.push(new Error(myTree.fileName,'Missende Parent',node,[node],['ParentID']));
 					} else {
 						myTree.ids[parentID].forEach(function(parent) {
-							parent.children.push(node);
+							parent.children.push(node.ID);
 						});
 					}
 				}
 			});
+			// run basic checks
+			// 1 root node per sheet (no orphans)
+			if (myTree.roots.length!=1) {
+				myTree.errors.unshift(new Error(
+					myTree.fileName,
+					'Deze sheet moet precies 1 root node hebben, maar heeft er '+myTree.roots.length,
+					null,
+					myTree.roots
+				));
+			}
+			// multiple entries for an ID have the same data
+			Object.keys(myTree.ids).forEach(function(id) {
+				myTree.ids[id] = myTree.ids[id].reduce(function(combinedNode, node) {
+					Object.keys(node).forEach(function(property) {
+						switch(property) {
+							case '_row':
+								combinedNode._rows.push(node._row);
+							break;
+							case 'children':
+								combinedNode.children = [... new Set(combinedNode.children.concat(node.children))];
+							break;
+							case 'ParentID':
+								// there is no need for the ParentID anymore, as we now have children
+								// combinedNode.parents = [... new Set(combinedNode.parents.concat(node.ParentID))];
+							break;
+							default:
+								if (!combinedNode.hasOwnProperty(property)) {
+									combinedNode[property] = node[property];
+								} else if (combinedNode[property].trim()!=node[property].trim()) {
+									// explicitly allow later nodes to leave out everything except ID by only iterating
+									// over the defined properties in node
+									myTree.errors.push(new Error(
+										myTree.fileName,
+										'Verschil in data '+property+' was '+combinedNode[property]+' nu '+node[property],
+										node,
+										myTree.ids[id],
+										[
+											property
+										]
+									));
+								}
+							break;
+						}
+					});
+					return combinedNode;				
+				}, new Entity());
+			});
+			if (!myTree.errors.length) {
+				myTree = tree.combineNodes(myTree);
+			}
 			return myTree;
+		},
+		combineNodes: function(myTree) {
+			// walk the root
+			var newTree = {
+				fileName: myTree.fileName,
+				ids: myTree.ids,
+				root: myTree.ids[myTree.roots[0].ID]
+			};
+			var walk = function(node, callback) {
+				node.children.forEach(function(nodeID) {
+					walk(newTree.ids[nodeID], callback);
+				});
+				callback(node);
+			};
+			walk(newTree.root, function(node) {
+				node.children = node.children.map(function(nodeID) {
+					return newTree.ids[nodeID];
+				});
+			});
+			return newTree;
 		}
 	};
