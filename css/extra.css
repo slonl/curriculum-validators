@@ -213,3 +213,29 @@
             text-overflow: ellipsis;
             overflow: hidden;
         }
+	.slo-table {
+		border-collapse: collapse;
+		border-spacing: 0;
+	}
+	.slo-table thead {
+		background-color: var(--brand);
+		color: var(--brand-contrast);
+	}
+	.slo-table thead th {
+		text-align: left;
+		padding: 2px 5px;
+	}
+	.slo-table tbody td {
+		border-bottom: 1px solid #888;
+		border-right: 1px solid #888;
+		padding: 2px 5px;
+	}
+	.slo-table tbody td:first-child {
+		border-left: 1px solid #888;
+	}
+	.slo-excel-error {
+		margin-bottom: 1em;
+	}
+	.slo-file {
+		font-style: italic;
+	}
