@@ -92,7 +92,33 @@
 		            </label>
 		            <button class="slo-button" type="submit">Upload</button>
                 </form>
-                <div class="slo-grid slo-grid-2 slo-space">
+                <div class="slo-space slo-excel-errors" data-simply-list="errors">
+                		<template>
+                			<div class="slo-excel-error">
+                				<div class="slo-excel-error-message" data-simply-field="error"></div>
+                				<div class="slo-file" data-simply-field="file"></div>
+                				<table class="slo-table">
+                					<thead>
+                						<tr>
+                							<th>regel</th>
+                							<th>ID</th>
+                							<th>Prefix</th>
+                							<th>Title</th>
+                						</tr>
+                					</thead>
+                					<tbody data-simply-list="rows">
+                					<template>
+                						<tr class="slo-excel-row">
+                							<td class="slo-excel-row-nr" data-simply-field="_row"></td>
+                							<td data-simply-field="ID"></td>
+                							<td data-simply-field="Prefix"></td>
+                							<td data-simply-field="Title"></td>
+                						</tr>
+                					</template>
+                					</tbody>
+                				</table>
+                			</div>
+                		</template>
                 </div>
             </div>
         </template>
