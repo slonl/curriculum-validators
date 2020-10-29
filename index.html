@@ -110,9 +110,9 @@
                 					<template>
                 						<tr class="slo-excel-row">
                 							<td class="slo-excel-row-nr" data-simply-field="_row"></td>
-                							<td data-simply-field="ID"></td>
-                							<td data-simply-field="Prefix"></td>
-                							<td data-simply-field="Title"></td>
+                							<td data-simply-field="id"></td>
+                							<td data-simply-field="prefix"></td>
+                							<td data-simply-field="title"></td>
                 						</tr>
                 					</template>
                 					</tbody>
@@ -120,6 +120,7 @@
                 			</div>
                 		</template>
                 </div>
+                <div class="slo-tree-render"></div>
             </div>
         </template>
     </main>
@@ -413,8 +414,10 @@
     });
 </script>
 <script src="js/tree.js"></script>
-<script src="node_modules/jszip/dist/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/jszip.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/xlsx.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ajv/6.12.6/ajv.min.js"
+integrity="sha512-+WCxUYg8L1mFBIyL05WJAJRP2UWCy+6mvpMHQbjPDdlDVcgS4XYyPhw5TVvzf9Dq8DTD/BedPW5745dqUeIP5g=="
+crossorigin="anonymous"></script>
 </body>
 </html>

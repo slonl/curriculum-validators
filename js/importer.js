@@ -4,14 +4,26 @@
         routes : {
         },
         commands: {
-        	uploadXLSX: function(form, values) {
-        		document.body.dataset.loading="true";
-        		var files = Array.from(form.files.files);
-        		return tree.importXLSX(files, values.context)
-        		.then(function(tree) {
-        			document.body.dataset.loading="false";
-	        	});
-        	},
+            uploadXLSX: function(form, values) {
+                document.body.dataset.loading="true";
+                var files = Array.from(form.files.files);
+                return tree.importXLSX(files, values.context)
+                .then(function(trees) {
+                    document.body.dataset.loading="false";
+                    console.log('trees',trees);
+                    var errors = [];
+                    var rendered = [];
+                    trees.forEach(function(myTree) {
+                        if (myTree.errors) {
+                            errors = errors.concat(myTree.errors);
+                        } else {
+                            rendered.push(tree.render(myTree.root));
+                        }
+                    });
+                    editor.pageData.errors = errors;
+                    document.querySelector('.slo-tree-render').innerHTML = rendered.join('');
+                });
+            },
             logoff: function() {
                 localStorage.removeItem('login');
                 location.reload(true);
@@ -20,8 +32,8 @@
                 document.body.dataset.loading="true";
                 return importTool.actions.start(values.username, values.password)
                 .then(function() {
-					window.username = values.username;
-					window.password = values.password;
+                    window.username = values.username;
+                    window.password = values.password;
                     document.body.dataset.loading="false";
                     document.getElementById('login').removeAttribute('open');
                     importTool.view['login-error'] = '';
@@ -123,6 +135,9 @@
                        var root = curriculum.index.id[editor.pageData.rootEntity];
                     importTool.actions.renderTree(root, editor.pageData.niveau, editor.pageData.schemas);
                 }                
+            },
+            'showEntity': function(el, value) {
+                el.classList.toggle('slo-open');
             }
         },
         actions: {
@@ -132,8 +147,8 @@
                  return Promise.resolve(true);
             },
             'autologin': function(username, password) {
-				window.username = username;
-				window.password = password;
+                window.username = username;
+                window.password = password;
                 document.body.dataset.loading="true";
                 return importTool.actions.start(username, password)
                 .then(function() {
@@ -243,8 +258,8 @@
             },
             start: function(user, pass) {
                 var schemas = {
-                    'curriculum-lpib': 'slonl/curriculum-lpib',
                     'curriculum-basis': 'slonl/curriculum-basis',
+                    'curriculum-lpib': 'slonl/curriculum-lpib',
                     'curriculum-kerndoelen': 'slonl/curriculum-kerndoelen',
                     'curriculum-examenprogramma': 'slonl/curriculum-examenprogramma',
                     'curriculum-examenprogramma-bg': 'slonl/curriculum-examenprogramma-bg',
@@ -275,11 +290,21 @@
                     simply.route.match();
                     return true;
                 })
-				.then(function() {
-        			return Promise.all(Object.keys(window.repos).map(function(context) {
-	        			return {name: context, schema: curriculum.loadContextFromGithub(context, window.repos[context], window.username, window.password, window.branchName)};
-					}))
-				});
+                .then(function() {
+                    return Promise.all(Object.keys(schemas).map(function(context) {
+                        return curriculum.loadContextFromGithub(context, window.repos[context], window.username, window.password, window.branchName);
+                    }));
+                })
+                .then(function(schemas) {
+                    curriculum.parsedSchemas = {};
+                    return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
+                        return curriculum.parseSchema(curriculum.schemas[context])
+                        .then(function(parsedSchema) {
+                            curriculum.parsedSchemas[context] = parsedSchema;
+                            return parsedSchema;
+                        });
+                    }));
+                });
             }
         }
     });

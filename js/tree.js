@@ -33,6 +33,11 @@
 		var self = this;
 		Object.keys(row).forEach(function(key) {
 			var value = ''+row[key]; // force entries to string
+			if (key=='ParentID') {
+				key = 'parentId';
+			} else {
+				key = key.toLowerCase();
+			}
 			self[key] = value.trim();
 		});
 		this.children = [];
@@ -52,10 +57,6 @@
 
 	function getExcelIndex(node) {
 		return '['+node._tree.fileName+':'+node._row+']';
-	}
-
-	function getTitle(node) {
-		return node.Prefix ? node.Prefix+': '+node.Title : node.Title;
 	}
 
 	var defaultProps = ['_row','ID','Prefix','Title'];
@@ -123,15 +124,17 @@
 			})
 			.then(function(trees) {
 				console.log(trees);
-				var errors = [];
-				trees.forEach(function(tree) {
-					if (tree.errors) {
-						errors = errors.concat(tree.errors);
-					}
-				});
-				console.log(errors);
-				editor.pageData.errors = errors;
-				return;
+				return trees;
+				/*
+					var errors = [];
+					trees.forEach(function(tree) {
+						if (tree.errors) {
+							errors = errors.concat(tree.errors);
+						}
+					});
+					console.log(errors);
+					editor.pageData.errors = errors;
+				*/
 				// assume contexts have been loaded
 				var schema = curriculum.schemas[context];
 				var jsonSets = trees.map(function(myTree) {
@@ -147,12 +150,19 @@
 				ids: {},
 				errors: []
 			};
+			var ids = {};
+
 			data.forEach(function(row, index) {
 				var node = new Node(row, index+2, myTree); // sheet is 1-indexed and has a header row
 				myTree.all[index] = node;
-				var nodeID = node.ID ? (''+node.ID).trim() : null;
+				var nodeID = node.id ? (''+node.id).trim() : null;
 				if (!nodeID) {
-					nodeID = node.ID = curriculum.uuidv4();
+					nodeID = node.id = curriculum.uuidv4();
+				} else if (!nodeID.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+					if (!ids[nodeID]) {
+						ids[nodeID] = uuidv4();
+					}
+					nodeID = ids[nodeID];
 				}
 				if (!myTree.ids[nodeID]) {
 					myTree.ids[nodeID] = [];
@@ -162,15 +172,18 @@
 			// link parents to children
 			// find rootnodes
 			myTree.all.forEach(function(node, index) {
-				var parentID = node.ParentID ? (''+node.ParentID).trim() : null;
-				if (!parentID) {
+				var parentId = node.parentId ? (''+node.parentId).trim() : null;
+				if (!parentId) {
 					myTree.roots.push(node);
 				} else {
-					if (!myTree.ids[parentID]) {
+					if (ids[parentId]) {
+						parentId = ids[parentId];
+					}
+					if (!myTree.ids[parentId]) {
 						myTree.errors.push(new Error(myTree.fileName,'Missende Parent',node,[node],['ParentID']));
 					} else {
-						myTree.ids[parentID].forEach(function(parent) {
-							parent.children.push(node.ID);
+						myTree.ids[parentId].forEach(function(parent) {
+							parent.children.push(node.id);
 						});
 					}
 				}
@@ -196,7 +209,7 @@
 							case 'children':
 								combinedNode.children = [... new Set(combinedNode.children.concat(node.children))];
 							break;
-							case 'ParentID':
+							case 'parentId':
 								// there is no need for the ParentID anymore, as we now have children
 								// combinedNode.parents = [... new Set(combinedNode.parents.concat(node.ParentID))];
 							break;
@@ -232,7 +245,7 @@
 			var newTree = {
 				fileName: myTree.fileName,
 				ids: myTree.ids,
-				root: myTree.ids[myTree.roots[0].ID]
+				root: myTree.ids[myTree.roots[0].id]
 			};
 			var walk = function(node, callback) {
 				node.children.forEach(function(nodeID) {
@@ -246,5 +259,25 @@
 				});
 			});
 			return newTree;
-		}
+		},
+	    render: function(entity) {
+	        if (!entity) {
+	            return '<span class="slo-treeview-title"><span class="slo-tag"></span>Missing</span>';
+	        }
+	        var title = (entity.prefix ? entity.prefix + ' ' + entity.title : (entity.title ? entity.title : entity.id));
+
+	        var result = '<span class="slo-treeview-title" data-simply-command="showEntity" data-simply-value="'+entity.id+'" title="'+escapeQuotes(entity.id)+'">';
+	        result += '<span class="slo-tag">'+entity.type+'</span><span class="slo-title">'+title+'</span></span>';
+	        result += '<div class="slo-treeview-children">';
+
+	        if (entity.children) {
+		        entity.children.forEach(function(child) {
+		            result += tree.render(child);
+		        });
+			}
+	        result += '</div>';
+
+	        return result;
+	    }		
+		
 	};

@@ -153,25 +153,7 @@
             background: transparent;
             margin: 0;
         }
-        .slo-remove-button {
-            position: absolute;
-            right: 2px;
-            display: none;
-            background-color: var(--brand);
-            border-radius: 50%;
-            padding: 4px;
-            color: var(--brand-contrast);
-            line-height: 1em !important;
-            height: 2em;
-            border: 3px solid white;
-            width: 2em;
-            margin-top: 2px;
-            font-weight: bold;
-            transition: all .2s ease;
-        }
-        .slo-remove-button:hover {
-            color: var(--brand-contrast);
-        }
+
         .slo-treeview-title:focus,
         .slo-treeview-title:hover {
             background-color: #EEE;
@@ -180,20 +162,13 @@
         .slo-treeview-title:hover .slo-remove-button {
             display: block;
         }
-        .slo-treeview-title.slo-removed,
-        .slo-removed {
-            text-decoration: line-through;
-        }
-        .slo-removed .slo-remove-button {
-            transform: rotate(45deg);
-            background-color: blue;
-        }
-        .slo-add-button {
-            background-color: var(--support);
-            color: black;
-            border-radius: 50%;
-            padding: 4px;
-        }
+		.slo-tree-render > .slo-treeview-title + .slo-treeview-children {
+			display: none;
+		}
+		.slo-tree-render .slo-treeview-title.slo-open + .slo-treeview-children {
+			display: block;
+		}
+		
         .slo-tag input {
             display: inline-block;
             width: auto;
