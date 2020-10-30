@@ -26,6 +26,14 @@ var curriculum = (function(curriculum){
 
     curriculum.errors = [];
 
+    curriculum.clone = function(ob) {
+        if (typeof ob == 'undefined' || ob == null) {
+            return null;
+        }
+        return JSON.parse(JSON.stringify(ob));
+    }
+
+
 	curriculum.parseSchema = function(schema) {
 		if (typeof $RefParser == 'undefined') {
 			console.error('json schema ref parser not loaded');

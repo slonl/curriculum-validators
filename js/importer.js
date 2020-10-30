@@ -13,15 +13,27 @@
                     console.log('trees',trees);
                     var errors = [];
                     var rendered = [];
+					var contexts = [];
                     trees.forEach(function(myTree) {
                         if (myTree.errors) {
                             errors = errors.concat(myTree.errors);
                         } else {
                             rendered.push(tree.render(myTree.root));
+							var context = tree.convertToContext(myTree.root);
+							contexts.push(context);
+							if (context.errors) {
+								errors = errors.concat(context.errors);
+							}
                         }
                     });
                     editor.pageData.errors = errors;
                     document.querySelector('.slo-tree-render').innerHTML = rendered.join('');
+					console.log(contexts);
+					var validations = [];
+					contexts.forEach(function(data) {
+						validations = validations.concat(validator.validate(values.context, data));
+					});
+					editor.pageData.validation = validations;
                 });
             },
             logoff: function() {
@@ -280,6 +292,45 @@
                     return profile;
                 })
                 .then(function() {
+                    return Promise.all(Object.keys(schemas).map(function(context) {
+                        return curriculum.loadContextFromGithub(context, window.repos[context], window.username, window.password, window.branchName)
+						.then(function() {
+							return curriculum.loadData(context);
+						});
+                    }));
+                })
+                .then(function() {
+                    curriculum.parsedSchemas = {};
+                    return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
+                        return curriculum.parseSchema(curriculum.schemas[context])
+                        .then(function(parsedSchema) {
+                            curriculum.parsedSchemas[context] = parsedSchema;
+                            return parsedSchema;
+                        });
+                    }));
+                })
+				.then(function() {
+					curriculum.validations = {};
+					validator.loadSchemas(Object.keys(curriculum.schemas));
+					return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
+						curriculum.validations[context] = validator.validate(context); //, curriculum.data);
+						return curriculum.validations[context];
+					}));
+				})
+				.then(function() {
+/*
+					editor.pageData.validation = [];
+					Object.keys(curriculum.validations).forEach(function(context) {
+						if (curriculum.validations[context]!==true) {
+							var validation = curriculum.validations[context];
+						} else {
+							var validation = [ { innerHTML: context+' is helemaal goed.' } ];
+						}
+						editor.pageData.validation = editor.pageData.validation.concat(validation);
+					});
+*/
+				})
+                .then(function() {
                     // restore changes from localstorage;
                     if (localStorage.importChanges) {
                         editor.pageData.changes = JSON.parse(localStorage.importChanges);
@@ -289,21 +340,6 @@
                     simply.route.handleEvents();
                     simply.route.match();
                     return true;
-                })
-                .then(function() {
-                    return Promise.all(Object.keys(schemas).map(function(context) {
-                        return curriculum.loadContextFromGithub(context, window.repos[context], window.username, window.password, window.branchName);
-                    }));
-                })
-                .then(function(schemas) {
-                    curriculum.parsedSchemas = {};
-                    return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
-                        return curriculum.parseSchema(curriculum.schemas[context])
-                        .then(function(parsedSchema) {
-                            curriculum.parsedSchemas[context] = parsedSchema;
-                            return parsedSchema;
-                        });
-                    }));
                 });
             }
         }

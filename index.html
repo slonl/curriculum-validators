@@ -121,6 +121,33 @@
                 		</template>
                 </div>
                 <div class="slo-tree-render"></div>
+                <div class="slo-space">
+                	<ol class="slo-validation" data-simply-list="validation">
+	                	<template>
+                			<li>
+								<span data-simply-field="innerHTML"></span>
+								<a class="slo-tag" target="editor" data-simply-field="entity.id" data-simply-transformer="editlink" data-simply-content="fixed">
+									<label class="slo-tag-label"><svg class="slo-icon slo-icon-feather"><use xlink:href="/assets/icons/feather-sprite.svg#link"></use></svg></label>
+									<span data-simply-field="entity.id"></span>
+								</a>
+								<span data-simply-field="entity.prefix"></span>
+								<span data-simply-field="entity.title"></span>
+								<ul data-simply-list="errors">
+									<template>
+										<li>
+											<span data-simply-field="innerHTML"></span>
+											<ul data-simply-list="errors" data-simply-entry="entry">
+												<template>
+													<li><span data-simply-field="entry"></span></li>
+												</template>
+											</ul>
+										</li>
+									</template>
+								</ul>
+                			</li>
+	                	</template>
+	                </ol>	                
+                </div>
             </div>
         </template>
     </main>
@@ -207,13 +234,14 @@
         },
         "editlink" : {
             "render" : function(data) {
+            	this._data = data;
                 return {
                     innerHTML : data,
-                    href : document.location.pathname + "#edit/" + data
+                    href : 'https://opendata.slo.nl/curriculum/beheer/entiteiten-editor/#edit/' + data
                 };
             },
             "extract" : function(el) {
-                return el.innerHTML;
+                return this._data;
             }
         },
         "uuid": {
@@ -413,11 +441,12 @@
         }
     });
 </script>
-<script src="js/tree.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/jszip.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.0/xlsx.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ajv/6.12.6/ajv.min.js"
 integrity="sha512-+WCxUYg8L1mFBIyL05WJAJRP2UWCy+6mvpMHQbjPDdlDVcgS4XYyPhw5TVvzf9Dq8DTD/BedPW5745dqUeIP5g=="
 crossorigin="anonymous"></script>
+<script src="js/tree.js"></script>
+<script src="js/validator.js"></script>
 </body>
 </html>
