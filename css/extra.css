@@ -193,8 +193,8 @@
 		border-spacing: 0;
 	}
 	.slo-table thead {
-		background-color: var(--brand);
-		color: var(--brand-contrast);
+		background-color: var(--medium-gray);
+		color: var(--medium-gray-contrast);
 	}
 	.slo-table thead th {
 		text-align: left;
@@ -210,6 +210,10 @@
 	}
 	.slo-excel-error {
 		margin-bottom: 1em;
+	}
+	.slo-excel-error-message {
+		font-size: 1.3em;
+		font-weight: bold;
 	}
 	.slo-file {
 		font-style: italic;

@@ -29,7 +29,7 @@
         }
     }
 
-	function Node(row, index, tree) {
+	function Node(tree, index, row={}) {
 		var self = this;
 		Object.keys(row).forEach(function(key) {
 			var value = ''+row[key]; // force entries to string
@@ -38,22 +38,79 @@
 			} else {
 				key = key.toLowerCase();
 			}
+			if (key=='type') {
+				value = value.toLowerCase();
+			}
 			self[key] = value.trim();
 		});
 		this.children = [];
 		this._row = index;
-		this._tree = tree;
-	}
-
-	function Entity(tree) {
-		this._rows = [];
-		this.children = [];
-		this.parents = [];
 		Object.defineProperty(this, '_tree', {
 			value: tree,
 			writeable: false,
 			enumerable: false
 		});
+	}
+
+	function CombinedNode(tree) {
+		this._rows = [];
+		this.children = [];
+		this.level = [];
+		Object.defineProperty(this, '_tree', {
+			value: tree,
+			writeable: false,
+			enumerable: false
+		});
+	}
+
+	function Entity(node, context, schema) {
+		var self = this;
+		this._rows = [];
+		this._node = node;
+		this.children = [];
+		this.parents = [];
+		Object.defineProperty(this, '_tree', {
+			value: node._tree,
+			writeable: false,
+			enumerable: false
+		});
+		var jsonSchema = tree.findSchema(node.type);
+		Object.keys(node).forEach(function(prop) {
+			self[prop] = node[prop];
+			if (self[prop] === '-') { // '-' is used to mark deletion of a property
+				delete self[prop]; // TODO: check if we should do that here or later
+			}
+			if (typeof self[prop] !== 'undefined' && jsonSchema.items && jsonSchema.items.properties[prop]) {
+				switch(jsonSchema.items.properties[prop].type) {
+					case 'integer':
+						if (String.isString(self[prop])) {
+							if (isNaN(self[prop])) {
+								context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een integer zijn',node,[node]));
+							} else {
+								self[prop] = +self[prop];
+							}
+						}
+					break;
+					case 'boolean':
+						self[prop] = !!self[prop];
+					break;
+					case 'array':
+						if (!Array.isArray(self[prop])) {
+							context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een array zijn',node,[node]));
+						}
+					break;
+					case 'string':
+					default:
+						self[prop] = ''+self[prop];
+					break;
+				}
+			}
+		});
+		context.index.id[this.id] = this;
+		context.index.type[this.id] = this.type;
+		delete this.children;
+		delete this.type;
+		delete this.parents;
 	}
 
 	function getExcelIndex(node) {
@@ -154,7 +211,7 @@
 			var ids = {};
 
 			data.forEach(function(row, index) {
-				var node = new Node(row, index+2, myTree); // sheet is 1-indexed and has a header row
+				var node = new Node(myTree, index+2, row); // sheet is 1-indexed and has a header row
 				myTree.all[index] = node;
 				var nodeID = node.id ? (''+node.id).trim() : null;
 				if (!nodeID) {
@@ -200,6 +257,7 @@
 					myTree.roots
 				));
 			}
+			var dataErrors = {};
 			// multiple entries for an ID have the same data
 			Object.keys(myTree.ids).forEach(function(id) {
 				myTree.ids[id] = myTree.ids[id].reduce(function(combinedNode, node) {
@@ -217,27 +275,47 @@
 								// there is no need for the ParentID anymore, as we now have children
 								// combinedNode.parents = [... new Set(combinedNode.parents.concat(node.ParentID))];
 							break;
+							case 'level':
+								// this is expected, level is used to link a doelniveau
+								if (node.level.substr(0,2)=='--') {
+									return; // this is a comment
+								}
+								var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
+								combinedNode.level = [... new Set(combinedNode.level.concat(levels))];
+							break;
 							default:
+								if (typeof node[property] == 'string') {
+									node[property] = node[property].trim();
+									if (node[property].substr(0,2)=='--') { // '--' at the start is used to mark a comment, should re-use the original value
+										return; // skip this value, it is a comment
+									}
+								}
 								if (!combinedNode.hasOwnProperty(property)) {
 									combinedNode[property] = node[property];
 								} else if (combinedNode[property].trim()!=node[property].trim()) {
-									// explicitly allow later nodes to leave out everything except ID by only iterating
-									// over the defined properties in node
-									myTree.errors.push(new Error(
-										myTree.fileName,
-										'Verschil in data '+property+' was '+combinedNode[property]+' nu '+node[property],
-										node,
-										myTree.ids[id],
-										[
-											property
-										]
-									));
+									if (!dataErrors[id] || !dataErrors[id][property]) {
+										// explicitly allow later nodes to leave out everything except ID by only iterating
+										// over the defined properties in node
+										myTree.errors.push(new Error(
+											myTree.fileName,
+											'Verschil in data '+property+' was &quot;'+combinedNode[property]+'&quot; nu &quot;'+node[property]+'&quot;',
+											node,
+											myTree.ids[id],
+											[
+												property
+											]
+										));
+										if (!dataErrors[id]) {
+											dataErrors[id] = {};
+										}
+										dataErrors[id][property] = true;
+									}
 								}
 							break;
 						}
 					});
 					return combinedNode;				
-				}, new Entity(myTree));
+				}, new CombinedNode(myTree));
 			});
 			if (!myTree.errors.length) {
 				myTree = tree.combineNodes(myTree);
@@ -321,7 +399,7 @@
 				var errors = [];
 				var niveaus = tree.getNiveausFromLevel(target, errors);
 				niveaus.forEach(function(niveau) {
-					var doelniveau = new Entity(entity._tree);
+					var doelniveau = new Entity(entity._node, context, schema);
 					doelniveau.id = curriculum.uuidv4();
 					doelniveau.niveau_id = [niveau];
 					doelniveau[prop+'_id'] = [ childId ];
@@ -346,12 +424,13 @@
 				});
 				delete entity[prop];
 			};
-			var makeDoelniveaus = function(entity) {
+			var makeDoelniveaus = function(entity, context) {
 				Object.keys(entity).forEach(function(prop) {
 					if (Array.isArray(entity[prop])) {
 						var schema = tree.findSchema(node.type);
 						if (!schema) {
-							throw new Error('No schema for '+node.type+' found');
+							context.errors.push( new Error(node._tree.fileName, 'No schema for '+node.type+' found', node, [node]) );
+							return;
 						}
 						// check that prop is part of entity definition
 						if (schema.properties[node.type].items.properties[prop]) {
@@ -368,15 +447,7 @@
 			};
 			
 			tree.walk(node, function(node) {
-				var entity = new Entity(node._tree);
-				Object.keys(node).forEach(function(prop) {
-					entity[prop] = node[prop];
-				});
-				context.index.id[entity.id] = entity;
-				context.index.type[entity.id] = entity.type;
-				delete entity.children;
-				delete entity.type;
-				delete entity.parents;
+				var entity = new Entity(node, context, schema);
 				node.children.forEach(function(child) {
 					if (!entity[child.type+'_id']) {
 						entity[child.type+'_id'] = [];
@@ -393,12 +464,13 @@
 					return;
 				}
 				context.data[prop].forEach(function(entity) {
-					makeDoelniveaus(entity);
+					makeDoelniveaus(entity, context);
 				});
 			});
 			return context;
 		},
 		findSchema: function(prop) {
+			prop = prop.trim().toLowerCase();
 			if (prop.endsWith('_id')) {
 				prop = prop.substring(0, prop.length-3);
 			}
@@ -417,7 +489,11 @@
                     curriculum.index.niveauTitle[niveau.title.trim().toLowerCase()] = niveau;
                 });
 			}
-			var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
+			if (Array.isArray(node.level)) {
+				var levels = node.level;
+			} else {
+				var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
+			}
 			return levels.map(function(level) {
 				if (curriculum.index.niveauTitle[level]) {
 					return curriculum.index.niveauTitle[level].id;

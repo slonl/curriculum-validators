@@ -19,7 +19,7 @@
                             errors = errors.concat(myTree.errors);
                         } else {
                             rendered.push(tree.render(myTree.root));
-							var context = tree.convertToContext(myTree.root);
+							var context = tree.convertToContext(myTree.root, values.context);
 							contexts.push(context);
 							if (context.errors) {
 								errors = errors.concat(context.errors);
