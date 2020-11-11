@@ -44,6 +44,7 @@
 			self[key] = value.trim();
 		});
 		this.children = [];
+		this.deletedChildren = [];
 		this._row = index;
 		Object.defineProperty(this, '_tree', {
 			value: tree,
@@ -55,26 +56,46 @@
 	function CombinedNode(tree) {
 		this._rows = [];
 		this.children = [];
+		this.deletedChildren = [];
 		this.level = [];
 		Object.defineProperty(this, '_tree', {
 			value: tree,
 			writeable: false,
 			enumerable: false
 		});
+		this._row = null;
 	}
 
 	function Entity(node, context, schema) {
+		if (context.index.id[node.id]) {
+			return context.index.id[node.id]; // prevent duplicate entities
+		}
 		var self = this;
 		this._rows = [];
 		this._node = node;
 		this.children = [];
+		this.deletedChildren = [];
 		this.parents = [];
+		Object.defineProperty(this, '_row', {
+			get: function() {
+				return this._rows.join(',');
+			}
+		});
 		Object.defineProperty(this, '_tree', {
 			value: node._tree,
 			writeable: false,
 			enumerable: false
 		});
+		Object.defineProperty(this, 'level', {
+			value: node.level,
+			writeable: true,
+			enumerable: false
+		});
 		var jsonSchema = tree.findSchema(node.type);
+		if (!jsonSchema) {
+			context.errors.push(new Error(node._tree.fileName, 'Type '+node.type+' is onbekend',node,[node]));
+			return;
+		}
 		Object.keys(node).forEach(function(prop) {
 			self[prop] = node[prop];
 			if (self[prop] === '-') { // '-' is used to mark deletion of a property
@@ -179,28 +200,10 @@
 					return tree.buildFromArray(sheet, sheet.fileName);
 				});
 				return trees;
-			})
-			.then(function(trees) {
-				console.log(trees);
-				return trees;
-				/*
-					var errors = [];
-					trees.forEach(function(tree) {
-						if (tree.errors) {
-							errors = errors.concat(tree.errors);
-						}
-					});
-					console.log(errors);
-					editor.pageData.errors = errors;
-				*/
-				// assume contexts have been loaded
-				var schema = curriculum.schemas[context];
-				var jsonSets = trees.map(function(myTree) {
-					return tree.convertToJSONSchema(myTree, schema);
-				});
 			});
 		},
 		buildFromArray: function(data, filename='') {
+			console.log('buildFromArray');
 			var myTree = {
 				fileName: filename,
 				roots: [],
@@ -242,7 +245,14 @@
 						myTree.errors.push(new Error(myTree.fileName,'Missende Parent',node,[node],['ParentID']));
 					} else {
 						myTree.ids[parentId].forEach(function(parent) {
-							parent.children.push(node.id);
+							if (node.deleted=='x') {
+								delete node.deleted; //CHECK: laten staan voor foutmeldingen?
+								parent.deletedChildren.push(node.id);
+							} else if (node.deleted) {
+								myTree.errors.push(new Error(myTree.filename,'Ongeldige waarde voor Deleted kolom',node,[node]));
+							} else {
+								parent.children.push(node.id);
+							}
 						});
 					}
 				}
@@ -267,9 +277,20 @@
 							break;
 							case '_row':
 								combinedNode._rows.push(node._row);
+								combinedNode._row = combinedNode._rows.join(',');
 							break;
 							case 'children':
 								combinedNode.children = [... new Set(combinedNode.children.concat(node.children))];
+							break;
+							case 'deletedChildren':
+								var conflicted = node.deletedChildren.filter(function(deletedChild) {
+									return combinedNode.children.indexOf(deletedChild)!==-1;	
+								});
+								if (conflicted.length) {
+									myTree.errors.push(new Error(myTree.fileName, 'Conflict in Deleted, deze kinderen zijn niet overal verwijderd', node, conflicted));
+								} else {
+									combinedNode.deletedChildren = [ ... new Set(combinedNode.deletedChildren.concat(node.deletedChildren))];
+								}
 							break;
 							case 'parentId':
 								// there is no need for the ParentID anymore, as we now have children
@@ -323,19 +344,20 @@
 			return myTree;
 		},
 		combineNodes: function(myTree) {
-			// walk the root
+			console.log('combineNodes');
 			var newTree = {
 				fileName: myTree.fileName,
 				ids: myTree.ids,
 				root: myTree.ids[myTree.roots[0].id]
 			};
-			var walk = function(node, callback) {
+			// deepest first walk, because we need to alter the children after walking them
+			var walkDeepestFirst = function(node, callback) {
 				node.children.forEach(function(nodeID) {
-					walk(newTree.ids[nodeID], callback);
+					walkDeepestFirst(newTree.ids[nodeID], callback);
 				});
 				callback(node);
 			};
-			walk(newTree.root, function(node) {
+			walkDeepestFirst(newTree.root, function(node) {
 				node.children = node.children.map(function(nodeID) {
 					return newTree.ids[nodeID];
 				});
@@ -383,6 +405,7 @@
 			return [...types];
 		},
 		convertToContext: function(node, schema) {
+			console.log('convertToContext');
 			var context = {
 				fileName: node._tree.fileName,
 				index: {
@@ -391,30 +414,33 @@
 				},
 				errors: [],
 				data: {
+					doelniveau: []
 				}
 			};
-			var makeDoelniveau = function(entity, prop, childId) {
+			var makeDoelniveau = function(entity, prop, child) {
 				// TODO: find existing doelniveau entry
-				var target = context.index.id[childId];
+				if (!entity.doelniveau_id) {
+					entity.doelniveau_id = [];
+				}
 				var errors = [];
-				var niveaus = tree.getNiveausFromLevel(target, errors);
+				var niveaus = tree.getNiveausFromLevel(child, errors);
 				niveaus.forEach(function(niveau) {
 					var doelniveau = new Entity(entity._node, context, schema);
 					doelniveau.id = curriculum.uuidv4();
 					doelniveau.niveau_id = [niveau];
-					doelniveau[prop+'_id'] = [ childId ];
+					doelniveau[prop+'_id'] = [ child.id ];
 					entity.doelniveau_id.push(doelniveau.id);
-					if (!context.doelniveau) {
-						context.doelniveau = [];
-					}
-					context.doelniveau.push(doelniveau);
+					context.data.doelniveau.push(doelniveau);
 					context.index.id[doelniveau.id] = doelniveau;
 					context.index.type[doelniveau.id] = 'doelniveau';
 				});
 				if (errors.length) {
 					context.errors = context.errors.concat(errors);
+				} else {
+					delete entity.level;
 				}
 			};
+/*
 			var convertPropToDoelniveaus = function(entity, prop) {
                 if (!entity['doelniveau_id']) {
 					entity.doelniveau_id = [];
@@ -429,7 +455,7 @@
 					if (Array.isArray(entity[prop])) {
 						var schema = tree.findSchema(node.type);
 						if (!schema) {
-							context.errors.push( new Error(node._tree.fileName, 'No schema for '+node.type+' found', node, [node]) );
+							context.errors.push( new Error(node._tree.fileName, 'Geen context.json schema voor '+node.type+' gevonden', node, [node]) );
 							return;
 						}
 						// check that prop is part of entity definition
@@ -445,20 +471,85 @@
 					}
 				});
 			};
-			
-			tree.walk(node, function(node) {
-				var entity = new Entity(node, context, schema);
-				node.children.forEach(function(child) {
-					if (!entity[child.type+'_id']) {
-						entity[child.type+'_id'] = [];
-					}
-					entity[child.type+'_id'].push(child.id);
-				});
-				if (!context.data[node.type]) {
-					context.data[node.type] = [];
+*/
+			var isDoelniveauLink = function(childType, nodeType, schema) {
+				if (!schema) {
+					schema = tree.findSchema(nodeType);
 				}
-				context.data[node.type].push(entity);
+				return (schema && schema.properties[nodeType]
+					&& schema.properties[nodeType].items.properties['doelniveau_id'] 
+					&& isDoelniveauChild(childType));
+			};
+
+			var isValidChildType = function(childType, nodeType, schema) {
+				if (!schema) {
+					schema = tree.findSchema(nodeType);
+				}
+				return (schema && schema.properties[nodeType]
+					&& ( 
+						schema.properties[nodeType].items.properties[childType+'_id']
+						|| isDoelniveauLink(childType, nodeType, schema)
+					)
+				);
+			};
+
+			var isDoelniveauChild = function(type) {
+				return !!curriculum.schemas['curriculum-basis'].properties['doelniveau'].items.properties[type+'_id'];
+			};
+
+			var addChildLink = function(entity, child, schema) {
+				var entityType = context.index.type[entity.id];
+				var entitySchema = tree.findSchema(entityType);
+				var entityProperties = entitySchema.properties[entityType].items.properties;
+				if (!child.type) {
+					var childType = context.index.type[child.id];
+				} else {
+					var childType = child.type;
+				}
+				var childSchema = tree.findSchema(childType);
+				var childProperties = childSchema.properties[childType].items.properties;
+				if (entityProperties[childType+'_id']) { // default case
+					if (!entity[childType+'_id']) {
+						entity[childType+'_id'] = [];
+					}
+					entity[childType+'_id'].push(child.id);
+				} else if (childProperties[entityType+'_id']) { // reverse parent child link
+					child.children.push(entity);
+				} else if (isDoelniveauLink(childType, entityType, schema)) {
+					// child is linked to parent entity through doelniveau
+					makeDoelniveau(entity, childType, child);
+				} else if (isDoelniveauChild(childType) && isDoelniveauChild(entityType)) {
+					// if so combine child in the entity's doelniveau
+					// doelniveau[child.type+'_id'] must have no other entries
+					// FIXME: implement this
+				}
+			};
+
+			tree.walk(node, function(node, parents) {
+				var entity = new Entity(node, context, schema);
+				if (entity.delete === 'x') {
+					return;
+				}
+				var nodeType = node.type ? node.type : context.index.type[node.id];
+				var schema = tree.findSchema(nodeType);
+				if (node.children && node.children.length) {
+					node.children.forEach(function(child) {
+						var childType = child.type ? child.type : context.index.type[child.id];
+						if (!node.delete=='x' && !isValidChildType(childType, nodeType, schema)) {
+							context.errors.push( new Error(node._tree.fileName, 'Type '+childType+' is geen valide kind van '+nodeType, child, [node, child]));
+							return;
+						}
+						addChildLink(entity, child, schema);
+					});
+				}
+				if (!context.data[nodeType]) {
+					context.data[nodeType] = [];
+				}
+				if (!context.index.id[node.id]) {
+					context.data[nodeType].push(entity);
+				}
 			});
+/*
 			Object.keys(context.data).forEach(function(prop) {
 				if (prop=='doelniveau') {
 					return;
@@ -467,6 +558,7 @@
 					makeDoelniveaus(entity, context);
 				});
 			});
+*/
 			return context;
 		},
 		findSchema: function(prop) {
