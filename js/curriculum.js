@@ -19,7 +19,8 @@ var curriculum = (function(curriculum){
     curriculum.index = {
         id: {},
         type: {},
-        schema: {}
+        schema: {},
+		deprecated: {}
     };
 
     curriculum.data = {};
@@ -268,6 +269,17 @@ var curriculum = (function(curriculum){
         .then(function(results) {
             Object.keys(data).forEach(function(propertyName) {
                 if (/deprecated/.exec(propertyName)) {
+					data[propertyName].then(function(entities) {
+						if (!curriculum.data.deprecated) {
+							curriculum.data.deprecated = [];
+						}
+						curriculum.data.deprecated = curriculum.data.deprecated.concat(entities);
+						entities.forEach(function(entity) {
+							if (entity.id) {
+								curriculum.index.deprecated[entity.id] = entity;
+							}
+						});
+					});
                     return;
                 }
                 data[propertyName].then(function(entities) {
