@@ -1,4 +1,4 @@
-
+	var contexts = [];
     var importTool = simply.app({
         container: document.body,
         routes : {
@@ -13,7 +13,6 @@
                     console.log('trees',trees);
                     var errors = [];
                     var rendered = [];
-					var contexts = [];
                     trees.forEach(function(myTree) {
                         if (myTree.errors) {
                             errors = errors.concat(myTree.errors);
@@ -26,8 +25,9 @@
 							}
                         }
                     });
-                    editor.pageData.errors = errors;
+                    editor.pageData.errors = errors.slice(0, 100);
                     document.querySelector('.slo-tree-render').innerHTML = rendered.join('');
+					console.log(errors);
 					console.log(contexts);
 					var validations = [];
 					contexts.forEach(function(data) {
