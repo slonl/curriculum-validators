@@ -106,7 +106,7 @@
 					switch(jsonSchema.items.properties[prop].type) {
 						case 'integer':
 							if (String.isString(self[prop])) {
-								if (isNaN(self[prop])) {
+								if (isNaN(Number(self[prop]))) {
 									context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een integer zijn',node,[node]));
 								} else {
 									self[prop] = +self[prop];
