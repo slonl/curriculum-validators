@@ -94,39 +94,41 @@
 		var jsonSchema = tree.findSchema(node.type);
 		if (!jsonSchema) {
 			context.errors.push(new Error(node._tree.fileName, 'Type '+node.type+' is onbekend',node,[node]));
-			return;
-		}
-		Object.keys(node).forEach(function(prop) {
-			self[prop] = node[prop];
-			if (self[prop] === '-') { // '-' is used to mark deletion of a property
-				delete self[prop]; // TODO: check if we should do that here or later
-			}
-			if (typeof self[prop] !== 'undefined' && jsonSchema.items && jsonSchema.items.properties[prop]) {
-				switch(jsonSchema.items.properties[prop].type) {
-					case 'integer':
-						if (String.isString(self[prop])) {
-							if (isNaN(self[prop])) {
-								context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een integer zijn',node,[node]));
-							} else {
-								self[prop] = +self[prop];
-							}
-						}
-					break;
-					case 'boolean':
-						self[prop] = !!self[prop];
-					break;
-					case 'array':
-						if (!Array.isArray(self[prop])) {
-							context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een array zijn',node,[node]));
-						}
-					break;
-					case 'string':
-					default:
-						self[prop] = ''+self[prop];
-					break;
+			this.id = node.id;
+			this.type = node.type;
+		} else {
+			Object.keys(node).forEach(function(prop) {
+				self[prop] = node[prop];
+				if (self[prop] === '-') { // '-' is used to mark deletion of a property
+					delete self[prop]; // TODO: check if we should do that here or later
 				}
-			}
-		});
+				if (typeof self[prop] !== 'undefined' && jsonSchema.items && jsonSchema.items.properties[prop]) {
+					switch(jsonSchema.items.properties[prop].type) {
+						case 'integer':
+							if (String.isString(self[prop])) {
+								if (isNaN(self[prop])) {
+									context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een integer zijn',node,[node]));
+								} else {
+									self[prop] = +self[prop];
+								}
+							}
+						break;
+						case 'boolean':
+							self[prop] = !!self[prop];
+						break;
+						case 'array':
+							if (!Array.isArray(self[prop])) {
+								context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een array zijn',node,[node]));
+							}
+						break;
+						case 'string':
+						default:
+							self[prop] = ''+self[prop];
+						break;
+					}
+				}
+			});
+		}
 		context.index.id[this.id] = this;
 		context.index.type[this.id] = this.type;
 		delete this.children;
@@ -500,14 +502,23 @@
 			var addChildLink = function(entity, child, schema) {
 				var entityType = context.index.type[entity.id];
 				var entitySchema = tree.findSchema(entityType);
-				var entityProperties = entitySchema.properties[entityType].items.properties;
+				var entityProperties = [];
+				if (entitySchema && entitySchema.properties[entityType]) {
+					entityProperties = entitySchema.properties[entityType].items.properties;
+				}
 				if (!child.type) {
 					var childType = context.index.type[child.id];
 				} else {
 					var childType = child.type;
 				}
 				var childSchema = tree.findSchema(childType);
-				var childProperties = childSchema.properties[childType].items.properties;
+				var childProperties = [];
+				if (childSchema && childSchema.properties[childType]) {
+					childProperties = childSchema.properties[childType].items.properties;
+				} else {
+					context.errors.push( new Error(entity._tree.fileName, 'Type '+childType+' is onbekend', child, [curriculum.clone(entity)]));
+					return;
+				}
 				if (entityProperties[childType+'_id']) { // default case
 					if (!entity[childType+'_id']) {
 						entity[childType+'_id'] = [];
