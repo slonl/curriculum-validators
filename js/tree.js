@@ -367,13 +367,17 @@
 			// deepest first walk, because we need to alter the children after walking them
 			var walkDeepestFirst = function(node, callback) {
 				node.children.forEach(function(nodeID) {
-					walkDeepestFirst((typeof nodeID == 'string' ? newTree.ids[nodeID] : nodeID), callback);
+					if (typeof nodeID == 'string') {
+						walkDeepestFirst(newTree.ids[nodeID], callback);
+					} else {
+						walkDeepestFirst(nodeID, callback);
+					}
 				});
 				callback(node);
 			};
 			walkDeepestFirst(newTree.root, function(node) {
 				node.children = node.children.map(function(nodeID) {
-					return (typeof nodeID == 'string' ? newTree.ids[nodeID] : nodeID);
+					return (typeof nodeID == 'string') ? newTree.ids[nodeID] : nodeID;
 				});
 			});
 			return newTree;
