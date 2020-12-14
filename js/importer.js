@@ -25,6 +25,7 @@
 							}
                         }
                     });
+					errors = errors.filter(Boolean);
 					if (errors.length) {
 	                    editor.pageData.errors = errors.slice(0, 100);
 					}
@@ -35,6 +36,7 @@
 							validations = validations.concat(valid);
 						}
 					});
+					validations = validations.filter(Boolean);
 					if (validations.length) {
 						editor.pageData.validation = validations;
 					}
