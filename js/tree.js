@@ -480,57 +480,6 @@
 				}
 			};
 
-			/**
-			 * Find existing doelniveau with exact same references
-			 * Only match on reference properties (*_id)
-			 */
-			var findDoelniveau = function(dn) {
-				var id = dn.id;
-				loop1:
-				for (var i=0, l=curriculum.data.doelniveau.length;i<l;i++) {
-					var dnMatch = curriculum.data.doelniveau[i];
-					var match = null;
-					// check that all properties of dn are in dnMatch and are the same
-					var props = Object.keys(dn);
-					loop2:
-					for (var pi=0,pl=props.length;pi<pl;pi++) {
-						var p = dn[props[pi]];
-						var pm = dnMatch[props[pi]];
-						if (Array.isArray(p) && Array.isArray(pm)) {
-							var s = new Set(p);
-							var sm = new Set(pm);
-							if (s.size != sm.size) {
-								match = false;
-								break loop2;
-							}
-							for (var sid of s) {
-								if (!sm.has(sid)) {
-									match = false;
-									break loop2;
-								}
-							}
-						}
-					}
-					if (match!==false) {
-						// check that all reference properties of dnMatch are in dn
-						var propsMatch = Object.keys(dnMatch);
-						for (var pi=0,pl=propsMatch.length;pi<pl;pi++) {
-							var p = dn[propsMatch[pi]];
-							var pm = dnMatch[propsMatch[pi]];
-							if (Array.isArray(pm) && pm.length) {
-								if (!Array.isArray(p)) {
-									match = false;
-									break;
-								}
-							}
-						}
-						if (match!==false) {
-							return dnMatch.id;
-						}
-					}
-				}
-				return id;
-			};
 
 			var isDoelniveauLink = function(childType, nodeType, schema) {
 				if (!schema) {
@@ -598,14 +547,15 @@
 					// if so combine child in the entity's doelniveau
 					// doelniveau[child.type+'_id'] must have no other entries
 					var doelniveau = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
-					if (!doelniveau) {
+					if (!doelniveau || !doelniveau.length) {
 //						debugger;
 					}
-					if (!doelniveau[entityType+'_id']) {
-						doelniveau[entityType+'_id'] = [];
+					doelniveau = doelniveau.pop(); // get last matching entry
+					if (!doelniveau[childType+'_id']) {
+						doelniveau[childType+'_id'] = [];
 					}
-					doelniveau[entityType+'_id'].push(entity);
-					moveDoelniveauProps(doelniveau, entity);
+					doelniveau[childType+'_id'].push(child.id);
+					moveDoelniveauProps(doelniveau, child);
 				} else if (isDoelniveauParent(childType) && isDoelniveauChild(entityType)) {
 					// reverse parent child relation
 					var doelniveaus = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
@@ -619,6 +569,84 @@
 					child.doelniveau_id.push(doelniveau.id);
 				}
 			};
+
+			/**
+			 * Find existing doelniveau with exact same references
+			 * Only match on reference properties (*_id)
+			 */
+			var findDoelniveau = function(dn) {
+				var id = dn.id;
+				loop1:
+				for (var i=0, l=curriculum.data.doelniveau.length;i<l;i++) {
+					var dnMatch = curriculum.data.doelniveau[i];
+					var match = null;
+					// check that all properties of dn are in dnMatch and are the same
+					var props = Object.keys(dn);
+					loop2:
+					for (var pi=0,pl=props.length;pi<pl;pi++) {
+						var p = dn[props[pi]];
+						var pm = dnMatch[props[pi]];
+						if (Array.isArray(p) && Array.isArray(pm)) {
+							var s = new Set(p);
+							var sm = new Set(pm);
+							if (s.size != sm.size) {
+								match = false;
+								break loop2;
+							}
+							for (var sid of s) {
+								if (!sm.has(sid)) {
+									match = false;
+									break loop2;
+								}
+							}
+						}
+					}
+					if (match!==false) {
+						// check that all reference properties of dnMatch are in dn
+						var propsMatch = Object.keys(dnMatch);
+						for (var pi=0,pl=propsMatch.length;pi<pl;pi++) {
+							var p = dn[propsMatch[pi]];
+							var pm = dnMatch[propsMatch[pi]];
+							if (Array.isArray(pm) && pm.length) {
+								if (!Array.isArray(p)) {
+									match = false;
+									break;
+								}
+							}
+						}
+						if (match!==false) {
+							return dnMatch.id;
+						}
+					}
+				}
+				return id;
+			};
+
+			var filterDuplicateDoelniveaus = function() {
+				if (context.data.doelniveau) {
+					context.data.doelniveau.forEach((dn,index) => {
+						var id = findDoelniveau(dn);
+						if (id!=dn.id) {
+							Object.keys(context.data).forEach(type => {
+								if (type!='doelniveau') {
+									context.data[type].forEach(e => {
+										if (e.doelniveau_id) {
+											var dnIndex = e.doelniveau_id.indexOf(dn.id);
+											if (dnIndex>=0) {
+												console.log('replacing link to doelniveau '+dn.id+' with '+id+' in '+e.id+' ('+context.index.type[e.id]+')');
+												e.doelniveau_id.splice(dnIndex, 1, id);
+											}
+										}
+									});
+								}
+							});
+							var removed = context.data.doelniveau.splice(index, 1);
+							console.log('removed duplicate doelniveau '+removed[0].id);
+						}
+					});
+				}
+			};
+
 
 			tree.walk(node, function(node, parents) {
 				var entity = new Entity(node, context, schema);
@@ -648,12 +676,139 @@
 					context.index.type[node.id] = nodeType;
 				}
 			});
-			if (context.data.doelniveau) {
-				context.data.doelniveau.forEach(dn => {
-					dn.id = findDoelniveau(dn);
-				});
-			}	
+			filterDuplicateDoelniveaus();
 			return context;
+		},
+		showChanges: function(el, sheetContexts) {
+			function escapeHtml(unsafe) {
+			    return unsafe
+			         .replace(/&/g, "&amp;")
+			         .replace(/</g, "&lt;")
+			         .replace(/>/g, "&gt;")
+			         .replace(/"/g, "&quot;")
+			         .replace(/'/g, "&#039;");
+			}
+
+			var hasDiff = function(newEntity, originalEntity) {
+				var props = Object.keys(newEntity);
+				for (var i=0,l=props.length;i<l;i++) {
+					var p = props[i];
+					if (!originalEntity[p]) {
+						return true;
+					}
+					if (typeof originalEntity[p] != typeof newEntity[p]) {
+						return true;
+					}
+					if (Array.isArray(originalEntity[p])) {
+						if (originalEntity[p].length != newEntity[p].length) {
+							return true;
+						}
+						var so = new Set(originalEntity[p]);
+						var se = new Set(newEntity[p]);
+						for (var v of se) {
+							if (!so.has(v)) {
+								return true;
+							}
+						}
+					} else if (originalEntity[p]!=newEntity[p]) {
+						return true;
+					}
+				}
+				return false;	
+			};
+
+			var cleanupByContext = function(contextName, type, entities) {
+				if (type == 'doelniveau') {
+//					debugger;
+				}
+				var result = [];
+				var schema = curriculum.schemas[contextName];
+				if (!schema) {
+					throw new Error('Unknown schema '+contextName);
+				}
+				var def    = schema.properties[type];
+				if (!def) {
+					throw new Error('Unknown property '+type+' in schema '+schema);
+				}
+				var props  = Object.keys(def.items.properties);
+
+				entities.forEach(e => {
+					var entity = {};
+					props.forEach(p => {
+						if (typeof e[p] != 'undefined') {
+							entity[p] = e[p];
+						}
+					});
+					if (curriculum.index.id[e.id]) {
+						if (hasDiff(entity, curriculum.index.id[entity.id])) {
+							result.push(entity);
+						}
+					} else {
+						result.push(entity);
+					}
+				});
+				return result;
+			};
+
+			// split sheetContexts into real contexts
+			// each property in the correct curriculum-* context
+			var toCurriculumContext = function(sheetContexts) {
+				var schemas = {};
+				sheetContexts.forEach(c => {
+					Object.keys(c.data).forEach(type => {
+						var schema = curriculum.getSchemaFromType(type);
+						if (!schemas[schema]) {
+							schemas[schema] = {};
+						}
+						if (!schemas[schema][type]) {
+							schemas[schema][type] = [];
+						}
+						schemas[schema][type] = schemas[schema][type].concat(cleanupByContext(schema, type, c.data[type]));
+					});
+				});
+				return schemas;
+			};
+
+			var output = '<h3>Gevonden wijzigingen</h3>';
+			output += '<p>Selecteer de contexten die u wilt opslaan</p>';
+			output += '<form data-simply-command="handle-changes">';
+			var schemas = toCurriculumContext(sheetContexts);
+			Object.keys(schemas).forEach(c => {
+				output += '<details class="slo-changes slo-changes-context">';
+				output += '<summary><input type="checkbox" checked name="applyChanges" value="'+escapeHtml(c)+'">' + escapeHtml(c) + '</summary>';
+				Object.keys(schemas[c]).forEach(p => {
+					var count = schemas[c][p].length;
+					if (!count) {
+						return;
+					}
+					output += '<details class="slo-changes slo-changes-type"><summary>' + escapeHtml(p) + ': ' + (count==1 ? '1 entiteit' : count + ' entiteiten') + '</summary>';
+					schemas[c][p].forEach(e => {
+						output += '<div class="slo-changes slo-changes-entity';
+						var change = false;
+						if (curriculum.index.id[e.id]) {
+							change = curriculum.index.id[e.id];
+							output += ' slo-changes-entity-updated';
+						} else {
+							output += ' slo-changes-entity-new';
+						}
+						output += '">';
+						Object.keys(e).forEach(ep => {
+							output += escapeHtml(ep)+': '+JSON.stringify(e[ep]);
+							if (change && change[ep] != e[ep]) {
+								output += ' (was: '+JSON.stringify(change[ep])+')';
+							}
+							output += '<br>';
+						});
+						output += '</div>';
+					});
+					output += '</details>';
+				});
+				output += '</details>';
+			});
+			output += '<div><button>Verwerk wijzigingen</button></div>';
+			el.innerHTML = output;
+			console.log(schemas);
+			editor.pageData.changedSchemas = schemas;
 		},
 		findSchema: function(prop) {
 			prop = prop.trim().toLowerCase();
