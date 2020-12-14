@@ -341,7 +341,7 @@
                             }
                         }
                         var file = files.shift();
-						debugger;
+//						debugger;
                         return curriculum.sources[file.schema].writeFile(file.path, file.data, message).then(writeFile);
                     }
                     return writeFile();
