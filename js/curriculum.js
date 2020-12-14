@@ -16,6 +16,8 @@ var curriculum = (function(curriculum){
 
     curriculum.schemas = {};
 
+	curriculum.schema = {};
+
     curriculum.index = {
         id: {},
         type: {},
@@ -33,7 +35,6 @@ var curriculum = (function(curriculum){
         }
         return JSON.parse(JSON.stringify(ob));
     }
-
 
 	curriculum.parseSchema = function(schema) {
 		if (typeof $RefParser == 'undefined') {
@@ -260,7 +261,7 @@ var curriculum = (function(curriculum){
                     }
                 })();
             } else {
-                data[propertyName] = null;
+                data[propertyName] = [];
             }
         });
 
@@ -289,6 +290,15 @@ var curriculum = (function(curriculum){
                         curriculum.data[propertyName] = [];
                     }
                     Array.prototype.push.apply(curriculum.data[propertyName],entities);
+
+					if (!curriculum.schema[name]) {
+						curriculum.schema[name] = {};
+					}
+					if (!curriculum.schema[name][propertyName]) {
+						curriculum.schema[name][propertyName] = [];
+					}
+					Array.prototype.push.apply(curriculum.schema[name][propertyName],entities);
+
                     var count = 0;
                     entities.forEach(function(entity) {
                         if (entity.id) {
