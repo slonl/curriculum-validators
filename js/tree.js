@@ -480,6 +480,58 @@
 				}
 			};
 
+			/**
+			 * Find existing doelniveau with exact same references
+			 * Only match on reference properties (*_id)
+			 */
+			var findDoelniveau = function(dn) {
+				var id = dn.id;
+				loop1:
+				for (var i=0, l=curriculum.data.doelniveau.length;i<l;i++) {
+					var dnMatch = curriculum.data.doelniveau[i];
+					var match = null;
+					// check that all properties of dn are in dnMatch and are the same
+					var props = Object.keys(dn);
+					loop2:
+					for (var pi=0,pl=props.length;pi<pl;pi++) {
+						var p = dn[props[pi]];
+						var pm = dnMatch[props[pi]];
+						if (Array.isArray(p) && Array.isArray(pm)) {
+							var s = new Set(p);
+							var sm = new Set(pm);
+							if (s.size != sm.size) {
+								match = false;
+								break loop2;
+							}
+							for (var sid of s) {
+								if (!sm.has(sid)) {
+									match = false;
+									break loop2;
+								}
+							}
+						}
+					}
+					if (match!==false) {
+						// check that all reference properties of dnMatch are in dn
+						var propsMatch = Object.keys(dnMatch);
+						for (var pi=0,pl=propsMatch.length;pi<pl;pi++) {
+							var p = dn[propsMatch[pi]];
+							var pm = dnMatch[propsMatch[pi]];
+							if (Array.isArray(pm) && pm.length) {
+								if (!Array.isArray(p)) {
+									match = false;
+									break;
+								}
+							}
+						}
+						if (match!==false) {
+							return dnMatch.id;
+						}
+					}
+				}
+				return id;
+			};
+
 			var isDoelniveauLink = function(childType, nodeType, schema) {
 				if (!schema) {
 					schema = tree.findSchema(nodeType);
@@ -545,10 +597,9 @@
 				} else if (isDoelniveauChild(childType) && isDoelniveauChild(entityType)) {
 					// if so combine child in the entity's doelniveau
 					// doelniveau[child.type+'_id'] must have no other entries
-					// FIXME: implement this
 					var doelniveau = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
 					if (!doelniveau) {
-						debugger;
+//						debugger;
 					}
 					if (!doelniveau[entityType+'_id']) {
 						doelniveau[entityType+'_id'] = [];
@@ -559,7 +610,7 @@
 					// reverse parent child relation
 					var doelniveaus = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
 					if (!doelniveaus) {
-						debugger;
+//						debugger;
 					}
 					if (!child.doelniveau_id) {
 						child.doelniveau_id = [];
@@ -578,9 +629,6 @@
 				var schema = tree.findSchema(nodeType);
 				if (node.children && node.children.length) {
 					node.children.forEach(function(child) {
-						if (child.prefix=="na/1/obhavo") {
-							debugger;
-						}
 						var childType = child.type ? child.type : context.index.type[child.id];
 						if (!node.delete=='x' && !isValidChildType(childType, nodeType, schema)) {
 							context.errors.push( new Error(node._tree.fileName, 'Type '+childType+' is geen valide kind van '+nodeType, child, [node, child]));
@@ -600,16 +648,11 @@
 					context.index.type[node.id] = nodeType;
 				}
 			});
-/*
-			Object.keys(context.data).forEach(function(prop) {
-				if (prop=='doelniveau') {
-					return;
-				}
-				context.data[prop].forEach(function(entity) {
-					makeDoelniveaus(entity, context);
+			if (context.data.doelniveau) {
+				context.data.doelniveau.forEach(dn => {
+					dn.id = findDoelniveau(dn);
 				});
-			});
-*/
+			}	
 			return context;
 		},
 		findSchema: function(prop) {
