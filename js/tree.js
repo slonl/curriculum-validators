@@ -97,17 +97,28 @@
 			this.id = node.id;
 			this.type = node.type;
 		} else {
+			if (node['verwijst naar:']) {
+				var targetId = node['verwijst naar:'];
+				var targetType = curriculum.index.type[targetId];
+				if (targetType) {
+					node[targetType+'_id'] = [targetId];
+				}
+				delete node['verwijst naar:'];
+			}
+			
+			var ignoreList = ['_rows','_row','children','deletedChildren','level','type'];
 			Object.keys(node).forEach(function(prop) {
 				self[prop] = node[prop];
 				if (self[prop] === '-') { // '-' is used to mark deletion of a property
 					delete self[prop]; // TODO: check if we should do that here or later
 				}
-				if (typeof self[prop] !== 'undefined' && jsonSchema.items && jsonSchema.items.properties[prop]) {
-					switch(jsonSchema.items.properties[prop].type) {
+				var properties = jsonSchema.properties[node.type].items.properties;
+				if (typeof self[prop] !== 'undefined' && properties[prop]) {
+					switch(properties[prop].type) {
 						case 'integer':
 							if (String.isString(self[prop])) {
 								if (isNaN(Number(self[prop]))) {
-									context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een integer zijn',node,[node]));
+									context.errors.push(new Error(node._tree.fileName, 'Eigenschap '+prop+' moet een integer zijn',node,[node]));
 								} else {
 									self[prop] = +self[prop];
 								}
@@ -126,10 +137,11 @@
 							self[prop] = ''+self[prop];
 						break;
 					}
+				} else if (!ignoreList.includes(prop)) {
+					context.errors.push(new Error(node._tree.fileName, 'Eigenschap '+prop+' is onbekend voor '+node.type, node, [node]));
 				}
 			});
 		}
-		context.index.id[this.id] = this;
 		context.index.type[this.id] = this.type;
 		delete this.children;
 		delete this.type;
@@ -355,13 +367,13 @@
 			// deepest first walk, because we need to alter the children after walking them
 			var walkDeepestFirst = function(node, callback) {
 				node.children.forEach(function(nodeID) {
-					walkDeepestFirst(newTree.ids[nodeID], callback);
+					walkDeepestFirst((typeof nodeID == 'string' ? newTree.ids[nodeID] : nodeID), callback);
 				});
 				callback(node);
 			};
 			walkDeepestFirst(newTree.root, function(node) {
 				node.children = node.children.map(function(nodeID) {
-					return newTree.ids[nodeID];
+					return (typeof nodeID == 'string' ? newTree.ids[nodeID] : nodeID);
 				});
 			});
 			return newTree;
@@ -419,6 +431,23 @@
 					doelniveau: []
 				}
 			};
+			var moveDoelniveauProps = function(doelniveau, child) {
+				var dnProps = curriculum.schemas['curriculum-basis'].properties.doelniveau.items.properties;
+				var childType = child.type ? child.type : context.index.type[child.id];
+				var childSchema = tree.findSchema(childType);
+				if (childSchema) {
+					var childProps = childSchema.properties[childType].items.properties;
+					Object.keys(dnProps).forEach(p => {
+						if (p!='id' && dnProps[p].type!='array' && child[p]) { //ignore arrays, only copy simple values
+							doelniveau[p] = child[p];
+							if (!childProps[p]) {
+								delete child[p];
+							}
+						}
+					});
+				}
+			};
+
 			var makeDoelniveau = function(entity, prop, child) {
 				// TODO: find existing doelniveau entry
 				if (!entity.doelniveau_id) {
@@ -427,10 +456,14 @@
 				var errors = [];
 				var niveaus = tree.getNiveausFromLevel(child, errors);
 				niveaus.forEach(function(niveau) {
-					var doelniveau = new Entity(entity._node, context, schema);
-					doelniveau.id = curriculum.uuidv4();
-					doelniveau.niveau_id = [niveau];
+					var dn = {
+						id: curriculum.uuidv4(),
+						type: 'doelniveau',
+						niveau_id: [ niveau ]
+					}; 
+					var doelniveau = new Entity(dn, context, schema);
 					doelniveau[prop+'_id'] = [ child.id ];
+					moveDoelniveauProps(doelniveau, child);
 					entity.doelniveau_id.push(doelniveau.id);
 					context.data.doelniveau.push(doelniveau);
 					context.index.id[doelniveau.id] = doelniveau;
@@ -442,38 +475,7 @@
 					delete entity.level;
 				}
 			};
-/*
-			var convertPropToDoelniveaus = function(entity, prop) {
-                if (!entity['doelniveau_id']) {
-					entity.doelniveau_id = [];
-				}
-				entity[prop].forEach(function(childId) {
-					makeDoelniveau(entity, prop, childId);
-				});
-				delete entity[prop];
-			};
-			var makeDoelniveaus = function(entity, context) {
-				Object.keys(entity).forEach(function(prop) {
-					if (Array.isArray(entity[prop])) {
-						var schema = tree.findSchema(node.type);
-						if (!schema) {
-							context.errors.push( new Error(node._tree.fileName, 'Geen context.json schema voor '+node.type+' gevonden', node, [node]) );
-							return;
-						}
-						// check that prop is part of entity definition
-						if (schema.properties[node.type].items.properties[prop]) {
-							return true;
-						}
-						// or part of doelniveau definition and entity has a doelniveau_id
-						if (schema.properties[node.type].items.properties['doelniveau_id']) {
-							if (curriculum.schemas['curriculum-basis'].properties['doelniveau'].items.properties[prop]) {
-								convertPropToDoelniveaus(entity, prop);
-							}
-						}
-					}
-				});
-			};
-*/
+
 			var isDoelniveauLink = function(childType, nodeType, schema) {
 				if (!schema) {
 					schema = tree.findSchema(nodeType);
@@ -497,6 +499,13 @@
 
 			var isDoelniveauChild = function(type) {
 				return !!curriculum.schemas['curriculum-basis'].properties['doelniveau'].items.properties[type+'_id'];
+			};
+			var isDoelniveauParent = function(type) {
+				var schema = tree.findSchema(type);
+				if (!schema) {
+					return false;
+				}
+				return (schema && schema.properties[type] && schema.properties[type].items.properties['doelniveau_id']);
 			};
 
 			var addChildLink = function(entity, child, schema) {
@@ -533,6 +542,26 @@
 					// if so combine child in the entity's doelniveau
 					// doelniveau[child.type+'_id'] must have no other entries
 					// FIXME: implement this
+					var doelniveau = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
+					if (!doelniveau) {
+						debugger;
+					}
+					if (!doelniveau[entityType+'_id']) {
+						doelniveau[entityType+'_id'] = [];
+					}
+					doelniveau[entityType+'_id'].push(entity);
+					moveDoelniveauProps(doelniveau, entity);
+				} else if (isDoelniveauParent(childType) && isDoelniveauChild(entityType)) {
+					// reverse parent child relation
+					var doelniveaus = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
+					if (!doelniveaus) {
+						debugger;
+					}
+					if (!child.doelniveau_id) {
+						child.doelniveau_id = [];
+					}
+					var doelniveau = doelniveaus.pop(); // pick the last defined doelniveau
+					child.doelniveau_id.push(doelniveau.id);
 				}
 			};
 
@@ -545,6 +574,9 @@
 				var schema = tree.findSchema(nodeType);
 				if (node.children && node.children.length) {
 					node.children.forEach(function(child) {
+						if (child.prefix=="na/1/obhavo") {
+							debugger;
+						}
 						var childType = child.type ? child.type : context.index.type[child.id];
 						if (!node.delete=='x' && !isValidChildType(childType, nodeType, schema)) {
 							context.errors.push( new Error(node._tree.fileName, 'Type '+childType+' is geen valide kind van '+nodeType, child, [node, child]));
@@ -558,6 +590,10 @@
 				}
 				if (!context.index.id[node.id]) {
 					context.data[nodeType].push(entity);
+					context.index.id[node.id] = entity;
+				}
+				if (!context.index.type[node.id]) {
+					context.index.type[node.id] = nodeType;
 				}
 			});
 /*
