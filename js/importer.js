@@ -25,15 +25,27 @@
 							}
                         }
                     });
-                    editor.pageData.errors = errors.slice(0, 100);
-                    document.querySelector('.slo-tree-render').innerHTML = rendered.join('');
-					console.log(errors);
-					console.log(contexts);
+					if (errors.length) {
+	                    editor.pageData.errors = errors.slice(0, 100);
+					}
 					var validations = [];
 					contexts.forEach(function(data) {
-						validations = validations.concat(validator.validate(values.context, data));
+						var valid = validator.validate(values.context, data);
+						if (valid.length) {
+							validations = validations.concat(valid);
+						}
 					});
-					editor.pageData.validation = validations;
+					if (validations.length) {
+						editor.pageData.validation = validations;
+					}
+					if (!errors.length && !validations.length) {
+						console.log('contexts',contexts);
+					} else {
+						console.log(errors);
+						console.log(validations);
+					}
+					
+                    document.querySelector('.slo-tree-render').innerHTML = rendered.join('');
                 });
             },
             logoff: function() {
