@@ -207,6 +207,7 @@
 	}
 	.slo-table tbody td:first-child {
 		border-left: 1px solid #888;
+		word-break: break-all;
 	}
 	.slo-excel-error {
 		margin-bottom: 1em;
