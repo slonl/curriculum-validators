@@ -223,3 +223,14 @@
 		font-style: italic;
 		margin: 0 0.5em;
 	}
+	.slo-changes {
+		margin-left: 1em;
+		padding-left: 1em;
+	}
+	.slo-changes-entity {
+		border-left: 2px solid green;
+		margin-bottom: 1em;
+	}
+	.slo-changes-entity-new {
+		border-left: 2px solid blue;
+	}
