@@ -110,13 +110,17 @@
 			this.id = node.id;
 			this.type = node.type;
 		} else {
-			if (node['verwijst naar']) {
-				var targetId = node['verwijst naar'];
+			var referencesKey = 'verwijst naar';
+			if (!node[referencesKey]) {
+				referencesKey = 'verwijst naar:';
+			}
+			if (node[referencesKey]) {
+				var targetId = node[referencesKey];
 				var targetType = curriculum.index.type[targetId];
 				if (targetType) {
 					node[targetType+'_id'] = [targetId];
 				}
-				delete node['verwijst naar'];
+				delete node[referencesKey];
 			}
 			
 			var ignoreList = ['_rows','_row','children','deletedChildren','parents','level','type'];
@@ -258,6 +262,7 @@
 				node.id = nodeID;
 				myTree.ids[nodeID].push(node);
 			});
+			window.idToUuid = ids;
 			// link parents to children
 			// find rootnodes
 			myTree.all.forEach(function(node, index) {
@@ -298,7 +303,7 @@
 			// multiple entries for an ID have the same data
 			Object.keys(myTree.ids).forEach(function(id) {
 				myTree.ids[id] = myTree.ids[id].reduce(function(combinedNode, node) {
-					Object.keys(node).concat(['children','deletedChildren','parents']).forEach(function(property) {
+					Object.keys(node).forEach(function(property) {
 						switch(property) {
 							case '_tree':
 							break;
@@ -308,6 +313,12 @@
 							break;
 							case 'children':
 								combinedNode.children = [... new Set(combinedNode.children.concat(node.children))];
+							break;
+							case 'parents':
+								if (!combinedNode.parents) {
+									combinedNode.parents = [];
+								}
+								combinedNode.parents = [... new Set(combinedNode.parents.concat(node.parents))];
 							break;
 							case 'deletedChildren':
 								var conflicted = node.deletedChildren.filter(function(deletedChild) {
@@ -340,7 +351,14 @@
 								}
 								if (!combinedNode.hasOwnProperty(property)) {
 									combinedNode[property] = node[property];
-								} else if (combinedNode[property].trim()!=node[property].trim()) {
+								} else if (node[property] 
+									&& (typeof combinedNode[property] != typeof node[property] 
+										|| (typeof node[property] == 'string' 
+											&& combinedNode[property].trim()!=node[property].trim()
+										)
+										|| (combinedNode[property] != node[property])
+									)
+								) {
 									if (!dataErrors[id] || !dataErrors[id][property]) {
 										// explicitly allow later nodes to leave out everything except ID by only iterating
 										// over the defined properties in node
@@ -472,6 +490,10 @@
 				}
 				var errors = [];
 				var niveaus = tree.getNiveausFromLevel(child, errors);
+				if (!niveaus.length) {
+					context.errors.push( new Error(child._tree.fileName, 'Geen levels opgegeven', child, [child]));
+					return;
+				}
 				niveaus.forEach(function(niveau) {
 					var dn = {
 						id: curriculum.uuidv4(),
@@ -561,7 +583,7 @@
 					// doelniveau[child.type+'_id'] must have no other entries
 					var doelniveau = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
 					if (!doelniveau || !doelniveau.length) {
-//						debugger;
+						return; // missing doelniveau because of earlier error
 					}
 					doelniveau = doelniveau.pop(); // get last matching entry
 					if (!doelniveau[childType+'_id']) {
@@ -573,13 +595,15 @@
 					// reverse parent child relation
 					var doelniveaus = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
 					if (!doelniveaus) {
-//						debugger;
+						debugger;
 					}
 					if (!child.doelniveau_id) {
 						child.doelniveau_id = [];
 					}
 					var doelniveau = doelniveaus.pop(); // pick the last defined doelniveau
 					child.doelniveau_id.push(doelniveau.id);
+				} else {
+					debugger; // missing case?
 				}
 			};
 
