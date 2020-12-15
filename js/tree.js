@@ -29,6 +29,19 @@
         }
     }
 
+	function NodeReplacer(key, value) {
+		switch(key) {
+			case 'children':
+			case 'deletedChildren':
+			case 'parents':
+				return undefined;
+			break;
+			default:
+				return value;
+			break;
+		}
+	}
+
 	function Node(tree, index, row={}) {
 		var self = this;
 		Object.keys(row).forEach(function(key) {
@@ -97,16 +110,16 @@
 			this.id = node.id;
 			this.type = node.type;
 		} else {
-			if (node['verwijst naar:']) {
-				var targetId = node['verwijst naar:'];
+			if (node['verwijst naar']) {
+				var targetId = node['verwijst naar'];
 				var targetType = curriculum.index.type[targetId];
 				if (targetType) {
 					node[targetType+'_id'] = [targetId];
 				}
-				delete node['verwijst naar:'];
+				delete node['verwijst naar'];
 			}
 			
-			var ignoreList = ['_rows','_row','children','deletedChildren','level','type'];
+			var ignoreList = ['_rows','_row','children','deletedChildren','parents','level','type'];
 			Object.keys(node).forEach(function(prop) {
 				self[prop] = node[prop];
 				if (self[prop] === '-') { // '-' is used to mark deletion of a property
@@ -118,7 +131,7 @@
 						case 'integer':
 							if (String.isString(self[prop])) {
 								if (isNaN(Number(self[prop]))) {
-									context.errors.push(new Error(node._tree.fileName, 'Eigenschap '+prop+' moet een integer zijn',node,[node]));
+									context.errors.push(new Error(node._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; moet een integer zijn',node,[node]));
 								} else {
 									self[prop] = +self[prop];
 								}
@@ -129,7 +142,7 @@
 						break;
 						case 'array':
 							if (!Array.isArray(self[prop])) {
-								context.errors.push(new Error(node._tree.fileName,'Eigenschap '+prop+' moet een array zijn',node,[node]));
+								context.errors.push(new Error(node._tree.fileName,'Eigenschap &quot;'+prop+'&quot; moet een array zijn',node,[node]));
 							}
 						break;
 						case 'string':
@@ -138,7 +151,7 @@
 						break;
 					}
 				} else if (!ignoreList.includes(prop)) {
-					context.errors.push(new Error(node._tree.fileName, 'Eigenschap '+prop+' is onbekend voor '+node.type, node, [node]));
+					context.errors.push(new Error(node._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; is onbekend voor '+node.type, node, [node]));
 				}
 			});
 		}
@@ -285,7 +298,7 @@
 			// multiple entries for an ID have the same data
 			Object.keys(myTree.ids).forEach(function(id) {
 				myTree.ids[id] = myTree.ids[id].reduce(function(combinedNode, node) {
-					Object.keys(node).forEach(function(property) {
+					Object.keys(node).concat(['children','deletedChildren','parents']).forEach(function(property) {
 						switch(property) {
 							case '_tree':
 							break;

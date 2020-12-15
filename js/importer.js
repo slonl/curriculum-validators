@@ -27,7 +27,10 @@
                     });
 					errors = errors.filter(Boolean);
 					if (errors.length) {
-	                    editor.pageData.errors = errors.slice(0, 100);
+						errors = errors.slice(0, 100).map(e => {
+							return JSON.parse(JSON.stringify(e, NodeReplacer));
+						});
+	                    editor.pageData.errors = errors;
 					}
 					var validations = [];
 					contexts.forEach(function(data) {
@@ -38,6 +41,10 @@
 					});
 					validations = validations.filter(Boolean);
 					if (validations.length) {
+						validations = validations.slice(0,100).map(v => {
+							v.entity = JSON.parse(JSON.stringify(v.entity, NodeReplacer));
+							return v;
+						});
 						editor.pageData.validation = validations;
 					}
 					if (!errors.length && !validations.length) {
