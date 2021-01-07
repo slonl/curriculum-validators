@@ -126,6 +126,9 @@
 			var ignoreList = ['_rows','_row','children','deletedChildren','parents','level','type'];
 			Object.keys(node).forEach(function(prop) {
 				self[prop] = node[prop];
+				if (typeof self[prop] == 'string') {
+					self[prop] = self[prop].trim();
+				}
 				if (self[prop] === '-') { // '-' is used to mark deletion of a property
 					delete self[prop]; // TODO: check if we should do that here or later
 				}
@@ -154,7 +157,7 @@
 							self[prop] = ''+self[prop];
 						break;
 					}
-				} else if (!ignoreList.includes(prop)) {
+				} else if (!ignoreList.includes(prop) && self[prop]!=='') {
 					context.errors.push(new Error(node._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; is onbekend voor '+node.type, node, [node]));
 				}
 			});
@@ -661,9 +664,39 @@
 
 			var filterDuplicateDoelniveaus = function() {
 				if (context.data.doelniveau) {
+					var refIndex = {};
+					Object.keys(context.index.id).forEach(id => {
+						var e = context.index.id[id];
+						if (e.doelniveau_id) {
+							e.doelniveau_id.forEach(childId => {
+								if (!refIndex[childId]) {
+									refIndex[childId] = [];
+								}
+								refIndex[childId].push(id);
+							});
+						}
+					});
 					context.data.doelniveau.forEach((dn,index) => {
 						var id = findDoelniveau(dn);
 						if (id!=dn.id) {
+/*
+							var references = refIndex[dn.id];
+							if (!references) {
+								debugger;
+							}
+							references.forEach(refId => {
+								var e = context.index.id[refId];
+								var dnIndex = e.doelniveau_id.indexOf(dn.id);
+								if (dnIndex>=0) {
+									console.log('replacing link to doelniveau '+dn.id+' with '+id+' in '+e.id+' ('+context.index.type[e.id]+')');
+									e.doelniveau_id.splice(dnIndex, 1, id);
+								}
+							});
+						}
+						var removed = context.data.doelniveau.splice(index, 1);
+						console.log('removed duplicate doelniveau '+removed[0].id);
+					});
+*/
 							Object.keys(context.data).forEach(type => {
 								if (type!='doelniveau') {
 									context.data[type].forEach(e => {
@@ -692,6 +725,10 @@
 				}
 				var nodeType = node.type ? node.type : context.index.type[node.id];
 				var schema = tree.findSchema(nodeType);
+				if (entity.level) {
+					var niveaus = tree.getNiveausFromLevel(entity, context.errors);
+					entity.niveau_id = niveaus;
+				}
 				if (node.children && node.children.length) {
 					node.children.forEach(function(child) {
 						var childType = child.type ? child.type : context.index.type[child.id];
@@ -713,7 +750,9 @@
 					context.index.type[node.id] = nodeType;
 				}
 			});
-			filterDuplicateDoelniveaus();
+			if (!context.errors || !context.errors.length) {
+				filterDuplicateDoelniveaus();
+			}
 			return context;
 		},
 		showChanges: function(el, sheetContexts) {
