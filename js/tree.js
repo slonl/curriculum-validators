@@ -606,13 +606,16 @@
 				} else if (isDoelniveauParent(childType) && isDoelniveauChild(entityType)) {
 					// reverse parent child relation
 					var doelniveaus = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
-					if (!doelniveaus) {
+					if (!doelniveaus || !doelniveaus.length) {
+						context.errors.push( new Error(child._tree.fileName, 'Kan geen doelniveau vinden voor omgekeerde parent-child link', child, [child, entity]));
 						debugger;
+						return;
 					}
 					if (!child.doelniveau_id) {
 						child.doelniveau_id = [];
 					}
 					var doelniveau = doelniveaus.pop(); // pick the last defined doelniveau
+					
 					child.doelniveau_id.push(doelniveau.id);
 				} else {
 					debugger; // missing case?
@@ -924,7 +927,7 @@
 				if (curriculum.index.niveauTitle[level]) {
 					return curriculum.index.niveauTitle[level].id;
 				} else {
-					errors.push(new Error(node._tree.fileName, 'Onbekend niveau '+level, node, [Object.assign(node, {_row: node._rows.join(',')})]));
+					errors.push(new Error(node._tree.fileName, 'Onbekend niveau '+level, node, [Object.assign({}, node, {_row: node._rows.join(',')})]));
 				}
 			}).filter(Boolean);
 		}
