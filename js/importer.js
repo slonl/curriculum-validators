@@ -151,6 +151,11 @@
                     simply.route.goto(document.location.pathname + '#new/');
                 }
             },
+			'remove-changes' : function() {
+				editor.pageData.changes = [];
+				editor.pageData.changeCount = 0;
+				localStorage.changes = JSON.stringify([]);
+			},
             'commit-changes' : function() {
                 document.body.dataset.loading="true";
                 importTool.actions['commit-changes'](editor.pageData.changes, editor.pageData.commitMessage)
@@ -235,9 +240,13 @@
 							if (!original) {
 								original = {};
 								Object.assign(original, entity); // overwrite information from entity into the original entity
+								original.unreleased = true;
 								curriculum.schema[schema][type].push(original);
 								curriculum.data[type].push(original);
 							} else {
+								if (!original.unreleased) {
+									original.dirty = true;
+								}
 								Object.assign(original, entity); // overwrite information from entity into the original entity
 								var index = curriculum.schema[schema][type].findIndex(e => e.id === entity.id);
 								if (index<0) {
