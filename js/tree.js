@@ -551,6 +551,15 @@
 				return (schema && schema.properties[type] && schema.properties[type].items.properties['doelniveau_id']);
 			};
 
+			var cloneForErrors = function(ob) {
+				var keys = ['_row','id','parentId','prefix','title'];
+				var clone = {};
+				keys.forEach(k => {
+					clone[k] = ob[k];
+				});
+				return clone;
+			};
+
 			var addChildLink = function(entity, child, schema) {
 				var entityType = context.index.type[entity.id];
 				var entitySchema = tree.findSchema(entityType);
@@ -568,7 +577,7 @@
 				if (childSchema && childSchema.properties[childType]) {
 					childProperties = childSchema.properties[childType].items.properties;
 				} else {
-					context.errors.push( new Error(entity._tree.fileName, 'Type '+childType+' is onbekend', child, [curriculum.clone(entity)]));
+					context.errors.push( new Error(entity._tree.fileName, 'Type '+childType+' is onbekend', child, [cloneForErrors(entity)]));
 					return;
 				}
 				if (entityProperties[childType+'_id']) { // default case
