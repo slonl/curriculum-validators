@@ -54,7 +54,11 @@
 			if (key=='type') {
 				value = value.toLowerCase();
 			}
-			self[key] = value.trim();
+			value = value.trim();
+			if (value == "``") {
+				value = "";
+			}
+			self[key] = value;
 		});
 		this.children = [];
 		this.deletedChildren = [];
@@ -584,7 +588,9 @@
 					if (!entity[childType+'_id']) {
 						entity[childType+'_id'] = [];
 					}
-					entity[childType+'_id'].push(child.id);
+					if (!entity[childType+'_id'].includes(child.id)) {
+						entity[childType+'_id'].push(child.id);
+					}
 				} else if (childProperties[entityType+'_id']) { // reverse parent child link
 					child.children.push(entity);
 				} else if (isDoelniveauLink(childType, entityType, schema)) {
