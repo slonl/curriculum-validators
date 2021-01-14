@@ -624,7 +624,8 @@
 					
 					child.doelniveau_id.push(doelniveau.id);
 				} else {
-					debugger; // missing case?
+					context.errors.push( new Error(entity._tree.fileName, 'Type '+childType+' mag niet gekoppeld worden aan '+entityType, child, [cloneForErrors(entity), child]));
+					return;
 				}
 			};
 
