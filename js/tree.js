@@ -466,7 +466,8 @@
 				fileName: node._tree.fileName,
 				index: {
 					id: {},
-					type: {}
+					type: {},
+					dnReferences: {}
 				},
 				errors: [],
 				data: {
@@ -498,10 +499,12 @@
 				var errors = [];
 				var niveaus = tree.getNiveausFromLevel(child, errors);
 				if (!niveaus.length) {
-					context.errors.push( new Error(child._tree.fileName, 'Geen levels opgegeven', child, [child]));
+					context.errors.push( new Error(child._tree.fileName, 'Geen levels opgegeven', child, [cloneForErrors(entity), child]));
 					return;
 				}
 				niveaus.forEach(function(niveau) {
+					// cannot search for existing doelniveau here, because more children may
+					// be added to this doelniveau later.
 					var dn = {
 						id: curriculum.uuidv4(),
 						type: 'doelniveau',
@@ -510,10 +513,10 @@
 					var doelniveau = new Entity(dn, context, schema);
 					doelniveau[prop+'_id'] = [ child.id ];
 					moveDoelniveauProps(doelniveau, child);
-					entity.doelniveau_id.push(doelniveau.id);
 					context.data.doelniveau.push(doelniveau);
 					context.index.id[doelniveau.id] = doelniveau;
 					context.index.type[doelniveau.id] = 'doelniveau';
+					entity.doelniveau_id.push(doelniveau.id);
 				});
 				if (errors.length) {
 					context.errors = context.errors.concat(errors);
@@ -630,59 +633,71 @@
 			};
 
 			/**
+             * check that all properties of dn are in dnMatch and are the same, and vice versa
+             */
+			var isMatch = function(dn, dnMatch) {
+				var match = null;
+				var props = Object.keys(dn);
+				for (var pi=0,pl=props.length;pi<pl;pi++) {
+					var p = dn[props[pi]];
+					var pm = dnMatch[props[pi]];
+					if (Array.isArray(p) && Array.isArray(pm)) {
+						var s = new Set(p);
+						var sm = new Set(pm);
+						if (s.size != sm.size) {
+							return false;
+						}
+						for (var sid of s) {
+							if (!sm.has(sid)) {
+								return false;
+							}
+						}
+					}
+				}
+				// check that all reference properties of dnMatch are in dn
+				var propsMatch = Object.keys(dnMatch);
+				for (var pi=0,pl=propsMatch.length;pi<pl;pi++) {
+					var p = dn[propsMatch[pi]];
+					var pm = dnMatch[propsMatch[pi]];
+					if (Array.isArray(pm) && pm.length) {
+						if (!Array.isArray(p)) {
+							return false;
+							break;
+						}
+					}
+				}
+
+				return true;
+			};
+
+			/**
 			 * Find existing doelniveau with exact same references
 			 * Only match on reference properties (*_id)
 			 */
 			var findDoelniveau = function(dn) {
-				var id = dn.id;
-				loop1:
-				for (var i=0, l=curriculum.data.doelniveau.length;i<l;i++) {
-					var dnMatch = curriculum.data.doelniveau[i];
-					var match = null;
-					// check that all properties of dn are in dnMatch and are the same
-					var props = Object.keys(dn);
-					loop2:
-					for (var pi=0,pl=props.length;pi<pl;pi++) {
-						var p = dn[props[pi]];
-						var pm = dnMatch[props[pi]];
-						if (Array.isArray(p) && Array.isArray(pm)) {
-							var s = new Set(p);
-							var sm = new Set(pm);
-							if (s.size != sm.size) {
-								match = false;
-								break loop2;
-							}
-							for (var sid of s) {
-								if (!sm.has(sid)) {
-									match = false;
-									break loop2;
+				for (const key in dn) {
+					if (key.substr(key.length-3)=='_id') {
+						for (const id of dn[key]) {
+							var idReferences = curriculum.index.references[id];
+							if (idReferences && idReferences.length) {
+								for (const refid of idReferences) { //var i=0, l=idReferences.length; i<l; i++) {
+									// var refid = idReferences[i]; 
+									if (curriculum.index.type[refid]=='doelniveau') {
+										if (isMatch(dn, curriculum.index.id[refid])) {
+											return refid;
+										}
+									}
 								}
 							}
-						}
-					}
-					if (match!==false) {
-						// check that all reference properties of dnMatch are in dn
-						var propsMatch = Object.keys(dnMatch);
-						for (var pi=0,pl=propsMatch.length;pi<pl;pi++) {
-							var p = dn[propsMatch[pi]];
-							var pm = dnMatch[propsMatch[pi]];
-							if (Array.isArray(pm) && pm.length) {
-								if (!Array.isArray(p)) {
-									match = false;
-									break;
-								}
-							}
-						}
-						if (match!==false) {
-							return dnMatch.id;
 						}
 					}
 				}
-				return id;
-			};
+				return false;
+			}
 
 			var filterDuplicateDoelniveaus = function() {
 				if (context.data.doelniveau) {
+					// build a reverse index for all references to doelniveau's in this context
 					var refIndex = {};
 					Object.keys(context.index.id).forEach(id => {
 						var e = context.index.id[id];
@@ -695,27 +710,14 @@
 							});
 						}
 					});
+
+					// now merge doelniveau's in this context that are identical
+					// FIXME:/TODO: implement
+
+					// now merge doelniveau's with curriculum doelniveau's that are identical
 					context.data.doelniveau.forEach((dn,index) => {
 						var id = findDoelniveau(dn);
-						if (id!=dn.id) {
-/*
-							var references = refIndex[dn.id];
-							if (!references) {
-								debugger;
-							}
-							references.forEach(refId => {
-								var e = context.index.id[refId];
-								var dnIndex = e.doelniveau_id.indexOf(dn.id);
-								if (dnIndex>=0) {
-									console.log('replacing link to doelniveau '+dn.id+' with '+id+' in '+e.id+' ('+context.index.type[e.id]+')');
-									e.doelniveau_id.splice(dnIndex, 1, id);
-								}
-							});
-						}
-						var removed = context.data.doelniveau.splice(index, 1);
-						console.log('removed duplicate doelniveau '+removed[0].id);
-					});
-*/
+						if (id && id!=dn.id) {
 							Object.keys(context.data).forEach(type => {
 								if (type!='doelniveau') {
 									context.data[type].forEach(e => {
