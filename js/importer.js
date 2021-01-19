@@ -378,7 +378,8 @@
                     'curriculum-examenprogramma-bg': 'slonl/curriculum-examenprogramma-bg',
                     'curriculum-syllabus': 'slonl/curriculum-syllabus',
                     'curriculum-doelgroepteksten': 'slonl/curriculum-doelgroepteksten',
-                    'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten'
+                    'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten',
+                    'curriculum-inhoudslijnen': 'slonl/curriculum-inhoudslijnen'
                 };
                 var branch = 'editor';
 
@@ -413,13 +414,14 @@
 				.then(function() {
 					curriculum.validations = {};
 					validator.loadSchemas(Object.keys(curriculum.schemas));
-					return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
+/*					return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
 						curriculum.validations[context] = validator.validate(context); //, curriculum.data);
 						return curriculum.validations[context];
 					}));
+*/
 				})
-				.then(function() {
 /*
+				.then(function() {
 					editor.pageData.validation = [];
 					Object.keys(curriculum.validations).forEach(function(context) {
 						if (curriculum.validations[context]!==true) {
@@ -429,8 +431,8 @@
 						}
 						editor.pageData.validation = editor.pageData.validation.concat(validation);
 					});
-*/
 				})
+*/
                 .then(function() {
                     // restore changes from localstorage;
                     if (localStorage.importChanges) {
