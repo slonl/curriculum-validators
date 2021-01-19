@@ -641,7 +641,10 @@
 				for (var pi=0,pl=props.length;pi<pl;pi++) {
 					var p = dn[props[pi]];
 					var pm = dnMatch[props[pi]];
-					if (Array.isArray(p) && Array.isArray(pm)) {
+					if (Array.isArray(p) && p.length) {
+						if (!Array.isArray(pm)) {
+							return false;
+						}
 						var s = new Set(p);
 						var sm = new Set(pm);
 						if (s.size != sm.size) {
@@ -725,7 +728,10 @@
 											var dnIndex = e.doelniveau_id.indexOf(dn.id);
 											if (dnIndex>=0) {
 												console.log('replacing link to doelniveau '+dn.id+' with '+id+' in '+e.id+' ('+context.index.type[e.id]+')');
-												e.doelniveau_id.splice(dnIndex, 1, id);
+												e.doelniveau_id.splice(dnIndex, 1);
+												if (!e.doelniveau_id.includes(id)) { // replacement doelniveau may already be there
+													e.doelniveau_id.push(id);
+												}
 											}
 										}
 									});
