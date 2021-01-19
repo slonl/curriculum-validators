@@ -22,6 +22,7 @@ var curriculum = (function(curriculum){
         id: {},
         type: {},
         schema: {},
+		references: {},
 		deprecated: {}
     };
 
@@ -214,6 +215,31 @@ var curriculum = (function(curriculum){
         }
     };
 
+	function updateReferences(object) {
+		Object.keys(object).forEach(k => {
+			if (Array.isArray(object[k]) 
+				&& ( k.substr(k.length-3)=='_id'
+					|| k=='replaces'
+					|| k=='replacedBy')
+			) {
+				object[k].forEach(id => {
+					if (!curriculum.index.references[id]) {
+						curriculum.index.references[id] = [];
+					}
+					curriculum.index.references[id].push(object.id);
+				});
+			} else if (k.substr(k.length-3)=='_id'
+				&& typeof object[k]=='string'
+			) {
+				var id = object[k];
+				if (!curriculum.index.references[id]) {
+					curriculum.index.references[id] = [];
+				}
+				curriculum.index.references[id].push(object.id);
+			}
+		});
+	}
+
     curriculum.loadData = function(name) {
         var schema = curriculum.schemas[name];
         var data = {};
@@ -310,15 +336,13 @@ var curriculum = (function(curriculum){
 								curriculum.index.id[entity.id] = entity;
 								curriculum.index.type[entity.id] = 'deprecated';
 								curriculum.index.schema[entity.id] = name;
+								updateReferences(entity);
 								deleted.push(entity.id);
                             } else {
                                 curriculum.index.id[entity.id] = entity;
                                 curriculum.index.type[entity.id] = propertyName;
                                 curriculum.index.schema[entity.id] = name;
-                            }
-                            if (entity.id=='c0f3b769-606e-488a-aeb1-405bf46df24a') {
-                                console.log(entity.id);
-                                console.log(curriculum.index.id[entity.id]);
+								updateReferences(entity);
                             }
                         } else {
                             curriculum.errors.push('Missing id in '+name+'.'+propertyName+': '+count);
