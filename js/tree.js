@@ -481,11 +481,9 @@
 				if (childSchema) {
 					var childProps = childSchema.properties[childType].items.properties;
 					Object.keys(dnProps).forEach(p => {
-						if (p!='id' && dnProps[p].type!='array' && child[p]) { //ignore arrays, only copy simple values
+						if (p!='id' && dnProps[p].type!='array' && child[p] && !childProps[p]) { //ignore arrays, only copy simple values
 							doelniveau[p] = child[p];
-							if (!childProps[p]) {
-								delete child[p];
-							}
+							delete child[p];
 						}
 					});
 				}
