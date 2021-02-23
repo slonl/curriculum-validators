@@ -108,9 +108,15 @@
 			writeable: true,
 			enumerable: false
 		});
-		var jsonSchema = tree.findSchema(node.type);
+		if (!node.type) {
+			context.errors.push(new Error(node._tree.fileName, 'Geen type opgegeven',node,[node]));
+		} else {
+			var jsonSchema = tree.findSchema(node.type);
+			if (!jsonSchema) {
+				context.errors.push(new Error(node._tree.fileName, 'Type '+node.type+' is onbekend',node,[node]));
+			}
+		}
 		if (!jsonSchema) {
-			context.errors.push(new Error(node._tree.fileName, 'Type '+node.type+' is onbekend',node,[node]));
 			this.id = node.id;
 			this.type = node.type;
 		} else {
@@ -577,6 +583,9 @@
 				} else {
 					var childType = child.type;
 				}
+				if (!childType) {
+					return;
+				}
 				var childSchema = tree.findSchema(childType);
 				var childProperties = [];
 				if (childSchema && childSchema.properties[childType]) {
@@ -749,6 +758,9 @@
 					return;
 				}
 				var nodeType = node.type ? node.type : context.index.type[node.id];
+				if (!nodeType) {
+					return;
+				}
 				var schema = tree.findSchema(nodeType);
 				if (entity.level) {
 					var niveaus = tree.getNiveausFromLevel(entity, context.errors);
