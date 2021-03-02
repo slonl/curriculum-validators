@@ -25,8 +25,10 @@
 							}
                         }
                     });
+					var showChanges = true;
 					errors = errors.filter(Boolean);
 					if (errors.length) {
+						showChanges = false;
 						errors = errors.slice(0, 100).map(e => {
 							return JSON.parse(JSON.stringify(e, NodeReplacer));
 						});
@@ -41,18 +43,16 @@
 					});
 					validations = validations.filter(Boolean);
 					if (validations.length) {
+						showChanges = false;
 						validations = validations.slice(0,100).map(v => {
 							v.entity = JSON.parse(JSON.stringify(v.entity, NodeReplacer));
 							return v;
 						});
 						editor.pageData.validation = validations;
 					}
-					if (!errors.length && !validations.length) {
+					if (showChanges) {
 						console.log('contexts',contexts);
 						tree.showChanges(document.querySelector('.slo-tree-changes'), contexts);
-					} else {
-						console.log(errors);
-						console.log(validations);
 					}
 					
                     document.querySelector('.slo-tree-render').innerHTML = rendered.join('');
@@ -379,7 +379,8 @@
                     'curriculum-syllabus': 'slonl/curriculum-syllabus',
                     'curriculum-doelgroepteksten': 'slonl/curriculum-doelgroepteksten',
                     'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten',
-                    'curriculum-inhoudslijnen': 'slonl/curriculum-inhoudslijnen'
+                    'curriculum-inhoudslijnen': 'slonl/curriculum-inhoudslijnen',
+                    'curriculum-referentiekader': 'slonl/curriculum-referentiekader'
                 };
                 var branch = 'editor';
 
