@@ -133,7 +133,6 @@
 				delete node[referencesKey];
 			}
 			
-			var ignoreList = ['_rows','_row','children','deletedChildren','parents','level','type'];
 			Object.keys(node).forEach(function(prop) {
 				self[prop] = node[prop];
 				if (typeof self[prop] == 'string') {
@@ -167,8 +166,6 @@
 							self[prop] = ''+self[prop];
 						break;
 					}
-				} else if (!ignoreList.includes(prop) && self[prop]!=='') {
-					context.errors.push(new Error(node._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; is onbekend voor '+node.type, node, [node]));
 				}
 			});
 		}
@@ -180,6 +177,19 @@
 
 	function getExcelIndex(node) {
 		return '['+node._tree.fileName+':'+node._row+']';
+	}
+
+	function parseNodeLevels(tree, node) {
+		if (node.level.substr(0,2)=='--') {
+			return; // this is a comment
+		}
+		var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
+		if (levels && tree.levels) {
+			if (!levels.every(level => tree.levels.includes(level))) {
+				tree.errors.push(new Error(tree.fileName, 'Node bevat een of meer levels die niet in de eerste rij van de sheet staan', node, [tree.roots[0], node]));
+			}
+		}
+		return levels;
 	}
 
 	var defaultProps = ['_row','ID','Prefix','Title'];
@@ -256,7 +266,7 @@
 				errors: []
 			};
 			var ids = {};
-
+			var firstNode = null;
 			data.forEach(function(row, index) {
 				var node = new Node(myTree, index+2, row); // sheet is 1-indexed and has a header row
 				myTree.all[index] = node;
@@ -290,10 +300,10 @@
 						myTree.errors.push(new Error(myTree.fileName,'Missende Parent',node,[node],['ParentID']));
 					} else {
 						myTree.ids[parentId].forEach(function(parent) {
-							if (node.deleted=='x') {
-								delete node.deleted; //CHECK: laten staan voor foutmeldingen?
+							if (node.delete=='x') {
+								delete node.delete; //CHECK: laten staan voor foutmeldingen?
 								parent.deletedChildren.push(node.id);
-							} else if (node.deleted) {
+							} else if (node.delete) {
 								myTree.errors.push(new Error(myTree.filename,'Ongeldige waarde voor Deleted kolom',node,[node]));
 							} else {
 								parent.children.push(node.id);
@@ -311,6 +321,16 @@
 					null,
 					myTree.roots
 				));
+			} else {
+				var root = myTree.roots[0];
+				if (!root.level) {
+					myTree.errors.push(new Error(myTree.fileName, 'Eerste row moet alle levels voor deze sheet bevatten',root,[root]));
+				} else {
+					myTree.levels = parseNodeLevels(myTree, root);
+					if (!myTree.levels) {
+						myTree.errors.push(new Error(myTree.fileName, 'Eerste row moet alle levels voor deze sheet bevatten',root,[root]));					
+					}
+				}
 			}
 			var dataErrors = {};
 			// multiple entries for an ID have the same data
@@ -349,11 +369,7 @@
 							break;
 							case 'level':
 								// this is expected, level is used to link a doelniveau
-								if (node.level.substr(0,2)=='--') {
-									return; // this is a comment
-								}
-								var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
-								combinedNode.level = [... new Set(combinedNode.level.concat(levels))];
+								combinedNode.level = [... new Set(combinedNode.level.concat(parseNodeLevels(myTree, node)))];
 							break;
 							default:
 								if (typeof node[property] == 'string') {
@@ -480,6 +496,7 @@
 					doelniveau: []
 				}
 			};
+			context.niveaus = tree.getNiveausFromLevel(node, context.errors);
 			var moveDoelniveauProps = function(doelniveau, child) {
 				var dnProps = curriculum.schemas['curriculum-basis'].properties.doelniveau.items.properties;
 				var childType = child.type ? child.type : context.index.type[child.id];
@@ -594,6 +611,7 @@
 					context.errors.push( new Error(entity._tree.fileName, 'Type '+childType+' is onbekend', child, [cloneForErrors(entity)]));
 					return;
 				}
+
 				if (entityProperties[childType+'_id']) { // default case
 					if (!entity[childType+'_id']) {
 						entity[childType+'_id'] = [];
@@ -752,39 +770,88 @@
 			};
 
 
-			tree.walk(node, function(node, parents) {
-				var entity = new Entity(node, context, schema);
+			tree.walk(node, function(myNode, parents) {
+				var entity = new Entity(myNode, context, schema);
 				if (entity.delete === 'x') {
 					return;
 				}
-				var nodeType = node.type ? node.type : context.index.type[node.id];
-				if (!nodeType) {
+				var myNodeType = myNode.type ? myNode.type : context.index.type[myNode.id];
+				if (!myNodeType) {
 					return;
 				}
-				var schema = tree.findSchema(nodeType);
+				var schema = tree.findSchema(myNodeType);
 				if (entity.level) {
 					var niveaus = tree.getNiveausFromLevel(entity, context.errors);
 					entity.niveau_id = niveaus;
 				}
-				if (node.children && node.children.length) {
-					node.children.forEach(function(child) {
+				if (myNode.children && myNode.children.length) {
+					myNode.children.forEach(function(child) {
 						var childType = child.type ? child.type : context.index.type[child.id];
-						if (!node.delete=='x' && !isValidChildType(childType, nodeType, schema)) {
-							context.errors.push( new Error(node._tree.fileName, 'Type '+childType+' is geen valide kind van '+nodeType, child, [node, child]));
-							return;
+						if (!child.delete || child.delete!='x') {
+							addChildLink(entity, child, schema);
 						}
-						addChildLink(entity, child, schema);
 					});
 				}
-				if (!context.data[nodeType]) {
-					context.data[nodeType] = [];
+
+				// final check that all properties are known properties for each entity
+				// doing that now, because addChildLink moves some properties around
+				var jsonSchema = tree.findSchema(myNodeType);
+				var properties = jsonSchema.properties[myNodeType].items.properties;
+				var ignoreList = ['_node','_rows','_row','children','deletedChildren','parents','level','type'];
+				Object.keys(entity).forEach(prop => {
+					if (typeof entity[prop] !== 'undefined' && !properties[prop]) {
+						if (!ignoreList.includes(prop) && entity[prop]!=='') {
+							if (prop == 'niveau_id') {
+								delete entity.niveau_id;
+							} else {
+								context.errors.push(new Error(myNode._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; is onbekend voor '+myNodeType, myNode, [myNode]));
+							}
+						}
+					}
+				});
+
+				let original = curriculum.index.id[entity.id];
+				if (original) {
+					if (curriculum.index.type[entity.id] !== myNodeType) {
+						context.errors.push( new Error(myNode._tree.fileName, 'Type matched niet, origineel heeft type '+curriculum.index.type[entity.id]+', row heeft type: '+myNodeType, myNode, [myNode]));
+					}
+					// here we have a single tree with just the myNodes contained in the sheet
+					// but the sheet doesn't have all myNodes, only for specific levels
+					// so for all the levels not in this sheet, add entity links from the current
+					// entities before importing this sheet.
+					// example: we are importing a sheet with information for level 'havo'
+					// the full tree also contains information for level 'vwo'
+					// importing this sheet must not result in removal of the entities linked to 'vwo'
+					if (original.doelniveau_id) {
+						original.doelniveau_id.forEach(dnId => {
+							let dn = curriculum.index.id[dnId];
+							if (!dn.niveau_id) {
+								// broken doelniveau, keep it, we'll fix it later
+								if (!entity.doelniveau_id) {
+									entity.doelniveau_id = [];
+								}
+								entity.doelniveau_id.push(dn.id);
+							} else if (!dn.niveau_id.every(niId => context.niveaus.includes(niId))) {
+								// this doelniveau contains a niveau id that is not in the uploaded excel sheet
+								// so add this doelniveau to the entity
+								if (!entity.doelniveau_id) {
+									entity.doelniveau_id = [];
+								}
+								entity.doelniveau_id.push(dn.id);
+							}
+						});
+					}
 				}
-				if (!context.index.id[node.id]) {
-					context.data[nodeType].push(entity);
-					context.index.id[node.id] = entity;
+
+				if (!context.data[myNodeType]) {
+					context.data[myNodeType] = [];
 				}
-				if (!context.index.type[node.id]) {
-					context.index.type[node.id] = nodeType;
+				if (!context.index.id[myNode.id]) {
+					context.data[myNodeType].push(entity);
+					context.index.id[myNode.id] = entity;
+				}
+				if (!context.index.type[myNode.id]) {
+					context.index.type[myNode.id] = myNodeType;
 				}
 			});
 			if (!context.errors || !context.errors.length) {
@@ -831,9 +898,6 @@
 			};
 
 			var cleanupByContext = function(contextName, type, entities) {
-				if (type == 'doelniveau') {
-//					debugger;
-				}
 				var result = [];
 				var schema = curriculum.schemas[contextName];
 				if (!schema) {
