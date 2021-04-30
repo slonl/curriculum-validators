@@ -201,6 +201,75 @@
 		this.rows = rows;
 	}
 
+	var niveauIndex = {};
+
+	/**
+	 * Returns a list of Niveau's relevant to this entity
+	 * Any niveau_id from a child in the same context is counted
+	 * As well as niveau_id's from doelniveau's that are linked
+	 */
+	function getNiveaus(originalEntityId) {
+		if (niveauIndex[originalEntityId]) {
+			return niveauIndex[originalEntityId];
+		}
+		var originalEntity = curriculum.index.id[originalEntityId];
+		if (originalEntity.niveau_id) {
+			niveauIndex[originalEntityId] = originalEntity.niveau_id;
+		} else {
+			var niveaus = [];
+			childrenInContext(originalEntityId).forEach(childId => {
+				niveaus = niveaus.concat(getNiveaus(childId));
+			});
+			niveauIndex[originalEntityId] = [... new Set(niveaus)];
+		}
+		return niveauIndex[originalEntityId];
+	}
+
+	/**
+	 * returns a list of all children (and children of children) in
+	 * the same context, adding doelniveau's as well.
+	 */
+	function childrenInContext(id) {
+		var entity = curriculum.index.id[id];
+		var schema = curriculum.index.schema[id];
+		var children = [];
+		Object.keys(entity).forEach(prop => {
+			if (prop.substr(prop.length-3)=='_id' && Array.isArray(entity[prop])) {
+				entity[prop].forEach(childId => {
+					var childSchema = curriculum.index.schema[childId];
+					if (childSchema==schema) {
+						children.push(childId);
+					} else if (childSchema=='curriculum-basis' && curriculum.index.type[childId] == 'doelniveau') {
+						children.push(childId);
+					}
+				});
+			}
+		});
+		return [... new Set(children)];
+	}
+
+	function referencesInContext(id) {
+		var schema = curriculum.index.schema[id];
+		var references = curriculum.index.references[id];
+		if (references) {
+			return references.filter(refId => {
+				var refSchema = curriculum.index.schema[refId];
+				return schema == refSchema || schema == 'curriculum-basis';
+			});
+		} else {
+			return [];
+		}
+	}
+
+	function getRoots(id) {
+		var references = referencesInContext(id);
+		if (!references.length) {
+			return id;
+		} else {
+			return [... new Set(references.map(refId => getRoots(refId)).flat())];
+		}
+	}
+
 	var tree = {
 		importXLSX: function(files, context) {
 			var errors = [];
@@ -769,6 +838,70 @@
 				}
 			};
 
+			function mergeEntityChildrenWithOtherNiveaus(entity, original, context) {
+				var schema = curriculum.index.schema[original.id];
+				Object.keys(original).forEach(prop => {
+					if (prop.substr(prop.length-3)=='_id' && Array.isArray(original[prop])) {
+						var missing = original[prop].filter(childId => {
+							return !entity[prop] || entity[prop].indexOf(childId)==-1;
+						});
+						if (missing.length) {
+							// remove children from other contexts, except doelniveau
+							missing = missing.filter(childId => {
+								return curriculum.index.type[childId] == 'doelniveau' || curriculum.index.schema[childId]==schema;
+							});
+						}
+						if (missing.length && entity.deletedChildren.length) {
+							// remove children that are explicitly deleted
+							missing = missing.filter(childId => entity.deletedChildren.indexOf(childId)==-1);
+						}
+						if (missing.length) {
+							// only merge childId's back that are used in niveau's not part of this excel sheet
+							var toMerge = missing.filter(childId => {
+								var niveaus = getNiveaus(childId);
+								var extraNiveaus = niveaus.filter(niveauId => context.niveaus.indexOf(niveauId)==-1);
+								return extraNiveaus.length>0;
+							});
+							// or have roots not part of this excel sheet
+							toMerge = toMerge.concat(missing.filter(childId => {
+								var roots = getRoots(childId).filter(rootId => [context.root,original.id].indexOf(rootId)!=-1);
+								return roots.length>0;
+							}));
+							if (toMerge.length) {
+								if (!entity[prop]) {
+									entity[prop] = [];
+								}
+								entity[prop] = [... new Set(entity[prop].concat(toMerge))];
+							}
+						}
+					}
+				});
+/*
+
+					if (original.doelniveau_id) {
+						original.doelniveau_id.forEach(dnId => {
+							let dn = curriculum.index.id[dnId];
+							if (entity.doelniveau_id && entity.doelniveau_id.indexOf(dnId)!== -1) {
+								return; // already linked
+							}
+							if (!dn.niveau_id) {
+								// broken doelniveau, keep it, we'll fix it later
+								if (!entity.doelniveau_id) {
+									entity.doelniveau_id = [];
+								}
+								entity.doelniveau_id.push(dn.id);
+							} else if (!dn.niveau_id.every(niId => context.niveaus.includes(niId))) {
+								// this doelniveau contains a niveau id that is not in the uploaded excel sheet
+								// so add this doelniveau to the entity
+								if (!entity.doelniveau_id) {
+									entity.doelniveau_id = [];
+								}
+								entity.doelniveau_id.push(dn.id);
+							}
+						});
+					}
+*/
+			}
 
 			tree.walk(node, function(myNode, parents) {
 				var entity = new Entity(myNode, context, schema);
@@ -822,25 +955,9 @@
 					// example: we are importing a sheet with information for level 'havo'
 					// the full tree also contains information for level 'vwo'
 					// importing this sheet must not result in removal of the entities linked to 'vwo'
-					if (original.doelniveau_id) {
-						original.doelniveau_id.forEach(dnId => {
-							let dn = curriculum.index.id[dnId];
-							if (!dn.niveau_id) {
-								// broken doelniveau, keep it, we'll fix it later
-								if (!entity.doelniveau_id) {
-									entity.doelniveau_id = [];
-								}
-								entity.doelniveau_id.push(dn.id);
-							} else if (!dn.niveau_id.every(niId => context.niveaus.includes(niId))) {
-								// this doelniveau contains a niveau id that is not in the uploaded excel sheet
-								// so add this doelniveau to the entity
-								if (!entity.doelniveau_id) {
-									entity.doelniveau_id = [];
-								}
-								entity.doelniveau_id.push(dn.id);
-							}
-						});
-					}
+					// this is not limited to doelniveau_id entries, but also inhoud entities
+					// so we need the niveauIndex for those
+					mergeEntityChildrenWithOtherNiveaus(entity, original, context);
 				}
 
 				if (!context.data[myNodeType]) {
@@ -946,6 +1063,17 @@
 				return schemas;
 			};
 
+			function getDiff(aNew, aOriginal) {
+				if (!aOriginal) {
+					var newEntries = aNew;
+					var removedEntries = [];
+				} else {
+					var newEntries = aNew.filter(id => aOriginal.indexOf(id) === -1);
+					var removedEntries = aOriginal.filter(id => aNew.indexOf(id) === -1);					
+				}
+				return [ newEntries.map(id => '<ins>+'+id+'</ins>').join(','), removedEntries.map(id => '<del>-'+id+'</del>').join(',')].join(',');
+			}
+
 			var output = '<h3>Gevonden wijzigingen</h3>';
 			output += '<p>Selecteer de contexten die u wilt opslaan</p>';
 			output += '<form data-simply-command="handle-changes">';
@@ -970,9 +1098,13 @@
 						}
 						output += '">';
 						Object.keys(e).forEach(ep => {
-							output += escapeHtml(ep)+': '+JSON.stringify(e[ep]);
-							if (change && change[ep] != e[ep]) {
-								output += ' (was: '+JSON.stringify(change[ep])+')';
+							if (Array.isArray(e[ep])) {
+								output += escapeHtml(ep)+': '+getDiff(e[ep], change[ep]);
+							} else {
+								output += escapeHtml(ep)+': <ins>'+JSON.stringify(e[ep])+'</ins>';
+								if (change && change[ep] != e[ep]) {
+									output += ' (was: <del>'+JSON.stringify(change[ep])+'</del>)';
+								}
 							}
 							output += '<br>';
 						});
