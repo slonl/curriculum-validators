@@ -234,3 +234,9 @@
 	.slo-changes-entity-new {
 		border-left: 2px solid blue;
 	}
+    ins {
+        color: green;
+    }
+    del {
+        color: red;
+    }
