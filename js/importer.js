@@ -160,7 +160,7 @@
                 document.body.dataset.loading="true";
                 importTool.actions['commit-changes'](editor.pageData.changes, editor.pageData.commitMessage)
                 .then(function(done) {
-                    done.sort().reverse().forEach(function(changeIndex) {
+                    done.sort((a,b)=>b-a).forEach(function(changeIndex) {
                         editor.pageData.changes.splice(changeIndex, 1);
                     })
                     editor.pageData.changeCount = editor.pageData.changes.length;
