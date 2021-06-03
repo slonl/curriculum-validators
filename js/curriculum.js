@@ -142,33 +142,47 @@ var curriculum = (function(curriculum){
         var repoUser = repository.split('/')[0];
         var repoName = repository.split('/')[1];
         var repo, branch = null;
-        var getFile = function(filename, list) {
-            var nodes = filename.split('/');
-            var node = nodes.shift();
-            var entry = list.data.tree.filter(function(file) {
-                return file.path == node;
-            }).pop();
-            hash = entry.sha;
-            if (nodes.length) {
-                return repo.getTree(hash).then(function(list) {
-                    return getFile(nodes.join('/'), list);
-                });
-            } else {
-                return repo.getBlob(hash).then(function(data) {
-                    return data.data;
-                });
-            }
+
+        let githubApi = {
+            file: simply.api.graphqlQuery(
+                'https://api.github.com/graphql', 
+                uery($owner: String!, $name: String!, $path:String!) {
+                  repository(owner: $owner, name: $name) {
+                        content:object(expression: $path) {
+                      ... on Blob {
+                        text
+                      }
+                    }
+                  }
+                },
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization':'Bearer '+password
+                    }
+                }
+            ).then(json => {
+                return json.data.repository.content.text;
+            })
         };
+
         if (gh.getUser()) {
             var repo = gh.getRepo(repoUser, repoName);
             curriculum.sources[name].repo = repo;
             curriculum.sources[name].getFile = function(filename) {
+				return githubApi.file({
+					owner: repoUser,
+					name: repoName,
+					path: filename
+				});
+/*
                 return new Promise(function(resolve, reject) {
                    fetch("https://raw.githubusercontent.com/" + repository + "/" + branchName + "/" + filename)
                     .then(function(response) {
                         return resolve(response.json());
                     });;
                 });
+*/
             };
 
             curriculum.sources[name].writeFile = function(filename, data, message) {
