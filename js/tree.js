@@ -116,6 +116,18 @@
 				context.errors.push(new Error(node._tree.fileName, 'Type '+node.type+' is onbekend',node,[node]));
 			}
 		}
+		if (curriculum.index.deprecated[node.id]) {
+			context.errors.push(new Error(node._tree.fileName, 'ID '+node.id+' is deprecated',node,[node]));
+		} else if (curriculum.index.type[node.id] && curriculum.index.type[node.id]!=node.type) {
+			context.errors.push(new Error(node._tree.fileName, 'Type mag niet veranderen bij importeren, was '+curriculum.index.type[node.id]+', aangepast naar '+node.type, node, [node]));
+		} else if (!curriculum.index.id[node.id]) {
+			// @TODO: check to make sure we don't add entities to other contexts
+			// except for tags/alias/doelniveaus/doelen
+			// 1 - get the root entity schema
+			// 2 - check that it is the same as this entities schema (jsonSchema)
+			// 3 - if not, check that the jsonSchema is for curriculum-basis and the entity type is one of tag/alias/doelniveau/doel
+		}
+
 		if (!jsonSchema) {
 			this.id = node.id;
 			this.type = node.type;
