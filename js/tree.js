@@ -44,12 +44,19 @@
 
 	function Node(tree, index, row={}) {
 		var self = this;
+		var aliases = {
+			'ID': 'id',
+			'Title':'title',
+			'Description':'description',
+			'ParentID':'parentId',
+			'Level':'level',
+			'Prefix':'prefix',
+			'Type':'type'
+		};
 		Object.keys(row).forEach(function(key) {
 			var value = ''+row[key]; // force entries to string
-			if (key=='ParentID') {
-				key = 'parentId';
-			} else {
-				key = key.toLowerCase();
+			if (aliases[key]) {
+				key = aliases[key];
 			}
 			if (key=='type') {
 				value = value.toLowerCase();
@@ -63,6 +70,7 @@
 		this.children = [];
 		this.deletedChildren = [];
 		this._row = index;
+		this._rowData = row;
 		Object.defineProperty(this, '_tree', {
 			value: tree,
 			writeable: false,
@@ -132,6 +140,7 @@
 			this.id = node.id;
 			this.type = node.type;
 		} else {
+			if (node.id==='292114fb-6f7a-4fdf-a59a-81980dfe7573') { debugger; }
 			var referencesKey = 'verwijst naar';
 			if (!node[referencesKey]) {
 				referencesKey = 'verwijst naar:';
@@ -141,6 +150,8 @@
 				var targetType = curriculum.index.type[targetId];
 				if (targetType) {
 					node[targetType+'_id'] = [targetId];
+				} else {
+					context.errors.push(new Error(node._tree.fileName, 'Verwijst naar referentie '+targetId+' is deprecated:',node,[node]));
 				}
 				delete node[referencesKey];
 			}
@@ -157,7 +168,7 @@
 				if (typeof self[prop] !== 'undefined' && properties[prop]) {
 					switch(properties[prop].type) {
 						case 'integer':
-							if (String.isString(self[prop])) {
+							if (typeof self[prop] === 'string' || self[prop] instanceof String) {
 								if (isNaN(Number(self[prop]))) {
 									context.errors.push(new Error(node._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; moet een integer zijn',node,[node]));
 								} else {
@@ -339,17 +350,8 @@
 		},
 		buildFromArray: function(data, filename='') {
 			console.log('buildFromArray');
-			var myTree = {
-				fileName: filename,
-				roots: [],
-				all: [],
-				ids: {},
-				errors: []
-			};
-			var ids = {};
-			var firstNode = null;
-			data.forEach(function(row, index) {
-				var node = new Node(myTree, index+2, row); // sheet is 1-indexed and has a header row
+			var createNode = function(row, index, myTree) {
+				var node = new Node(myTree, index, row);
 				myTree.all[index] = node;
 				var nodeID = node.id ? (''+node.id).trim() : null;
 				if (!nodeID) {
@@ -365,8 +367,149 @@
 				}
 				node.id = nodeID;
 				myTree.ids[nodeID].push(node);
-			});
+				return node;
+			}
+			var createNodes = function(rows, myTree) {
+				rows.forEach((row, index) => createNode(row, index+2, myTree)); // sheet is 1-indexed and has a header row
+			};
+
+			// fill in missing doelniveau's, since these are position (row) dependent
+			/*
+				in:
+					entity A
+						doel X
+							kerndoel Y
+				out:
+					entity A
+						doelniveau Z
+							doel X
+							kerndoel Y
+			*/
+			// if we do this after building the tree, doel X will have incorrect child kerndoel Y
+			var insertDoelniveaus = function(myTree) {
+				
+				// get node with id with highest index < topIndex
+				var findNodeByID = function(id, topIndex) {
+					var allNodes = myTree.ids[id].slice();
+					allNodes.reverse();
+					var node = null;
+					do {
+						node = allNodes.pop();
+					} while(node && node._row>=topIndex);
+					return node;
+				};
+
+				var canHaveChild = function(parent, child) {
+					var parentSchema = tree.findSchema(parent.type);
+					return typeof parentSchema.properties[parent.type].items.properties[child.type+'_id'] != 'undefined';
+				};
+
+				var hasDoelniveauLink = function(parent, child) {
+					var parentSchema = tree.findSchema(parent.type);
+					if (typeof parentSchema.properties[parent.type].items.properties.doelniveau_id != 'undefined') {
+						var basisSchema = tree.findSchema('doelniveau');
+						return typeof basisSchema.properties.doelniveau.items.properties[child.type+'_id'] != 'undefined';
+					}
+					return false;
+				};
+
+				var removeDoelniveauProperties = function(dn, node) {
+					//var basisSchema = tree.findSchema('doelniveau');
+					// properties allowed on doelniveau
+					var dnAllowed = ['id','parentId','type','level','ce_se','prefix','children','deletedChildren'];
+					// properties to move from child to doelniveau
+					var dnMove = ['level','ce_se','prefix'];
+					dnMove.forEach(p => {
+						if (typeof dn[p]!='undefined' && typeof node[p]!='undefined' && dn[p]==node[p]) {
+							delete node[p];
+						}
+					});
+					Object.keys(dn).forEach(p => {
+						if (p[0]!='_' && !dnAllowed.includes(p)) {
+							delete dn[p];
+						}
+					});
+				};
+
+				var moveDoelniveauChildren = function(node, doelniveau, myTree) {
+					//FIXME: assumes doelniveau children have no child rows themselves
+					//FIXME: assumes all doelniveau children occur immediately after node._row in the sheet
+					var index = node._row+1;
+					do {
+						var nextChild = myTree.all[index];
+						if (nextChild && nextChild.parentId == node.id) {
+							nextChild.parentId = doelniveau.id;
+						} else {
+							nextChild = null;
+						}
+						index++
+					} while(nextChild);
+				};
+
+				var insertDoelniveau = function(parent, node, myTree) {
+					// create new row with type doelniveau and new uuid and index node._row
+					// TODO: check if there is an assumption later that _row is unique
+					var newIndex = myTree.all.length+1;
+					var fakeRow = curriculum.clone(node._rowData);
+					// change id to new uuid, existing doelniveaus will be searched for later
+					fakeRow.id = curriculum.uuidv4();
+					fakeRow.type = 'doelniveau';
+					myTree.generatedDoelniveaus.push(fakeRow.id);
+
+					// insert doelniveau as child of parent
+					fakeRow.parentId = parent.id;
+					var dn  = createNode(fakeRow, newIndex, myTree);
+					myTree.all[newIndex] = dn;
+
+					// move node to child of doelniveau
+					node.parentId = dn.id;
+
+					// remove properties from node that are now in doelniveau (prefix, level, ce_se, ?)
+					removeDoelniveauProperties(dn, node);
+
+					// move children of node to dn
+					moveDoelniveauChildren(node, dn, myTree);
+				};
+
+				if (tree.roots) {
+					throw new Exception('Doelniveaus must be inserted before building the tree structure');
+				}
+				var nodes = myTree.all;
+				nodes.forEach((node, index) => {
+					if (!node.parentId) {
+						return;
+					}
+					let parent = findNodeByID(node.parentId, index); // find last definition of parentId
+					if (parent && !canHaveChild(parent, node)) {
+						// maybe need to insert doelniveau
+						if (hasDoelniveauLink(parent, node)) {
+							// insert doelniveau, move next set of child rows to that doelniveau, if possible
+							insertDoelniveau(parent, node, myTree);
+						}
+					}
+				});
+			};
+
+			var myTree = {
+				fileName: filename,
+				roots: [],
+				all: [],
+				ids: {},
+				errors: [],
+				generatedDoelniveaus: []
+			};
+			var ids = {};
+			var firstNode = null;
+			// first create all nodes and give them uuids if not yet set
+			createNodes(data, myTree);
+
+			// expose ids for debugging
 			window.idToUuid = ids;
+
+			// do this before building the tree structure, or the tree will be incorrect.
+//			var reverseGeneratedDoelniveaus = {};
+			insertDoelniveaus(myTree);
+
 			// link parents to children
 			// find rootnodes
 			myTree.all.forEach(function(node, index) {
@@ -421,6 +564,8 @@
 						switch(property) {
 							case '_tree':
 							break;
+							case '_rowData':
+							break;
 							case '_row':
 								combinedNode._rows.push(node._row);
 								combinedNode._row = combinedNode._rows.join(',');
@@ -474,7 +619,7 @@
 										// over the defined properties in node
 										myTree.errors.push(new Error(
 											myTree.fileName,
-											'Verschil in data '+property+' was &quot;'+combinedNode[property]+'&quot; nu &quot;'+node[property]+'&quot;',
+											'Verschil in data '+property+' was &quot;'+JSON.stringify(combinedNode[property])+'&quot; nu &quot;'+JSON.stringify(node[property])+'&quot;',
 											node,
 											myTree.ids[id],
 											[
@@ -527,14 +672,14 @@
 	        if (!entity) {
 	            return '<span class="slo-treeview-title"><span class="slo-tag"></span>Missing</span>';
 	        }
-	        var title = (entity.prefix ? entity.prefix + ' ' + entity.title : (entity.title ? entity.title : entity.id));
+	        var title = (entity.prefix ? entity.prefix + ' ' : '') + (entity.title ? entity.title : entity.id);
 
-	        var result = '<span class="slo-treeview-title" data-simply-command="showEntity" data-simply-value="'+entity.id+'" title="'+escapeQuotes(entity.id)+'">';
+	        var result = '<details><summary class="slo-treeview-title" data-simply-value="'+entity.id+'" title="'+escapeQuotes(entity.id)+'">';
 	        result += '<span class="slo-tag">'+entity.type+'</span><span class="slo-title">'+title+'</span>';
 			if (entity.level) {
 				result += '<span class="slo-level">'+entity.level+'</span>';
 			}
-			result += '</span>';
+			result += '</summary>';
 	        result += '<div class="slo-treeview-children">';
 
 	        if (entity.children) {
@@ -542,7 +687,7 @@
 		            result += tree.render(child);
 		        });
 			}
-	        result += '</div>';
+	        result += '</div></details>';
 
 	        return result;
 	    },
@@ -578,87 +723,6 @@
 				}
 			};
 			context.niveaus = tree.getNiveausFromLevel(node, context.errors);
-			var moveDoelniveauProps = function(doelniveau, child) {
-				var dnProps = curriculum.schemas['curriculum-basis'].properties.doelniveau.items.properties;
-				var childType = child.type ? child.type : context.index.type[child.id];
-				var childSchema = tree.findSchema(childType);
-				if (childSchema) {
-					var childProps = childSchema.properties[childType].items.properties;
-					Object.keys(dnProps).forEach(p => {
-						if (p!='id' && dnProps[p].type!='array' && child[p] && !childProps[p]) { //ignore arrays, only copy simple values
-							doelniveau[p] = child[p];
-							delete child[p];
-						}
-					});
-				}
-			};
-
-			var makeDoelniveau = function(entity, prop, child) {
-				// TODO: find existing doelniveau entry
-				if (!entity.doelniveau_id) {
-					entity.doelniveau_id = [];
-				}
-				var errors = [];
-				var niveaus = tree.getNiveausFromLevel(child, errors);
-				if (!niveaus.length) {
-					context.errors.push( new Error(child._tree.fileName, 'Geen levels opgegeven', child, [cloneForErrors(entity), child]));
-					return;
-				}
-				niveaus.forEach(function(niveau) {
-					// cannot search for existing doelniveau here, because more children may
-					// be added to this doelniveau later.
-					var dn = {
-						id: curriculum.uuidv4(),
-						type: 'doelniveau',
-						niveau_id: [ niveau ]
-					}; 
-					var doelniveau = new Entity(dn, context, schema);
-					doelniveau[prop+'_id'] = [ child.id ];
-					moveDoelniveauProps(doelniveau, child);
-					context.data.doelniveau.push(doelniveau);
-					context.index.id[doelniveau.id] = doelniveau;
-					context.index.type[doelniveau.id] = 'doelniveau';
-					entity.doelniveau_id.push(doelniveau.id);
-				});
-				if (errors.length) {
-					context.errors = context.errors.concat(errors);
-				} else {
-					delete entity.level;
-				}
-			};
-
-
-			var isDoelniveauLink = function(childType, nodeType, schema) {
-				if (!schema) {
-					schema = tree.findSchema(nodeType);
-				}
-				return (schema && schema.properties[nodeType]
-					&& schema.properties[nodeType].items.properties['doelniveau_id'] 
-					&& isDoelniveauChild(childType));
-			};
-
-			var isValidChildType = function(childType, nodeType, schema) {
-				if (!schema) {
-					schema = tree.findSchema(nodeType);
-				}
-				return (schema && schema.properties[nodeType]
-					&& ( 
-						schema.properties[nodeType].items.properties[childType+'_id']
-						|| isDoelniveauLink(childType, nodeType, schema)
-					)
-				);
-			};
-
-			var isDoelniveauChild = function(type) {
-				return !!curriculum.schemas['curriculum-basis'].properties['doelniveau'].items.properties[type+'_id'];
-			};
-			var isDoelniveauParent = function(type) {
-				var schema = tree.findSchema(type);
-				if (!schema) {
-					return false;
-				}
-				return (schema && schema.properties[type] && schema.properties[type].items.properties['doelniveau_id']);
-			};
 
 			var cloneForErrors = function(ob) {
 				var keys = ['_row','id','parentId','prefix','title'];
@@ -702,36 +766,6 @@
 					}
 				} else if (childProperties[entityType+'_id']) { // reverse parent child link
 					child.children.push(entity);
-				} else if (isDoelniveauLink(childType, entityType, schema)) {
-					// child is linked to parent entity through doelniveau
-					makeDoelniveau(entity, childType, child);
-				} else if (isDoelniveauChild(childType) && isDoelniveauChild(entityType)) {
-					// if so combine child in the entity's doelniveau
-					// doelniveau[child.type+'_id'] must have no other entries
-					var doelniveau = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
-					if (!doelniveau || !doelniveau.length) {
-						return; // missing doelniveau because of earlier error
-					}
-					doelniveau = doelniveau.pop(); // get last matching entry
-					if (!doelniveau[childType+'_id']) {
-						doelniveau[childType+'_id'] = [];
-					}
-					doelniveau[childType+'_id'].push(child.id);
-					moveDoelniveauProps(doelniveau, child);
-				} else if (isDoelniveauParent(childType) && isDoelniveauChild(entityType)) {
-					// reverse parent child relation
-					var doelniveaus = context.data.doelniveau.filter(e => e[entityType+'_id'] && e[entityType+'_id'].includes(entity.id));
-					if (!doelniveaus || !doelniveaus.length) {
-						context.errors.push( new Error(child._tree.fileName, 'Kan geen doelniveau vinden voor omgekeerde parent-child link', child, [child, entity]));
-						debugger;
-						return;
-					}
-					if (!child.doelniveau_id) {
-						child.doelniveau_id = [];
-					}
-					var doelniveau = doelniveaus.pop(); // pick the last defined doelniveau
-					
-					child.doelniveau_id.push(doelniveau.id);
 				} else {
 					context.errors.push( new Error(entity._tree.fileName, 'Type '+childType+' mag niet gekoppeld worden aan '+entityType, child, [cloneForErrors(entity), child]));
 					return;
@@ -743,7 +777,7 @@
              */
 			var isMatch = function(dn, dnMatch) {
 				var match = null;
-				var props = Object.keys(dn);
+				var props = Object.keys(dn).filter(p => p.substr(0,1)!='_');
 				for (var pi=0,pl=props.length;pi<pl;pi++) {
 					var p = dn[props[pi]];
 					var pm = dnMatch[props[pi]];
@@ -780,75 +814,97 @@
 			};
 
 			/**
+			 * Return an array of child id's from *_id references in entity
+			 */
+			var getChildren = function(entity) {
+				var children = new Set();
+				for (const key in entity) {
+					if (key.substr(key.length-3,3)==='_id') {
+						children = new Set([...children].concat(entity[key]));
+					}
+				}
+				return [...children];
+			}
+
+			/**
 			 * Find existing doelniveau with exact same references
 			 * Only match on reference properties (*_id)
 			 */
-			var findDoelniveau = function(dn) {
-				for (const key in dn) {
-					if (key.substr(key.length-3)=='_id') {
-						for (const id of dn[key]) {
-							var idReferences = curriculum.index.references[id];
-							if (idReferences && idReferences.length) {
-								for (const refid of idReferences) { //var i=0, l=idReferences.length; i<l; i++) {
-									// var refid = idReferences[i]; 
-									if (curriculum.index.type[refid]=='doelniveau') {
-										if (isMatch(dn, curriculum.index.id[refid])) {
-											return refid;
-										}
-									}
-								}
-							}
-						}
+			var findDoelniveau = function(dnId, refIndex) {
+				var dn = context.index.id[dnId];
+				var possibles = new Set;
+				for (const childId of getChildren(dn)) {
+					// find all doelniveaus that reference this child
+					var childDnRefs = new Set(curriculum.index.references[childId].filter(id => curriculum.index.type[id]=='doelniveau'));
+					if (!possibles.size) {
+						possibles = childDnRefs;
+					} else {
+						// filter, keep only those that are already in the possibles list
+						possibles = new Set([...possibles].filter(id => childDnRefs.has(id)));
+					}
+					if (!possibles.size) {
+						// no possible match, so don't continue
+						return false;
+					}
+				}
+				for (const possibleMatch of possibles) {
+					if (isMatch(dn, curriculum.index.id[possibleMatch])) {
+						return possibleMatch;
 					}
 				}
 				return false;
 			}
 
-			var filterDuplicateDoelniveaus = function() {
-				if (context.data.doelniveau) {
-					// build a reverse index for all references to doelniveau's in this context
-					var refIndex = {};
-					Object.keys(context.index.id).forEach(id => {
-						var e = context.index.id[id];
-						if (e.doelniveau_id) {
-							e.doelniveau_id.forEach(childId => {
-								if (!refIndex[childId]) {
-									refIndex[childId] = [];
-								}
-								refIndex[childId].push(id);
-							});
-						}
-					});
-
-					// now merge doelniveau's in this context that are identical
-					// FIXME:/TODO: implement
-
-					// now merge doelniveau's with curriculum doelniveau's that are identical
-					context.data.doelniveau.forEach((dn,index) => {
-						var id = findDoelniveau(dn);
-						if (id && id!=dn.id) {
-							Object.keys(context.data).forEach(type => {
-								if (type!='doelniveau') {
-									context.data[type].forEach(e => {
-										if (e.doelniveau_id) {
-											var dnIndex = e.doelniveau_id.indexOf(dn.id);
-											if (dnIndex>=0) {
-												console.log('replacing link to doelniveau '+dn.id+' with '+id+' in '+e.id+' ('+context.index.type[e.id]+')');
-												e.doelniveau_id.splice(dnIndex, 1);
-												if (!e.doelniveau_id.includes(id)) { // replacement doelniveau may already be there
-													e.doelniveau_id.push(id);
-												}
-											}
-										}
-									});
-								}
-							});
-							var removed = context.data.doelniveau.splice(index, 1);
-							console.log('removed duplicate doelniveau '+removed[0].id);
-						}
-					});
+			var replaceDoelniveau = function(entity, oldId, newId) {
+				if (!entity.doelniveau_id) {
+					throw new Error('Entity '+entity.id+' has no doelniveau_id');
+				}
+				var dnIndex = entity.doelniveau_id.indexOf(oldId);
+				if (dnIndex>=0) {
+					console.log('replacing link to doelniveau '+oldId+' with '+newId+' in '+entity.id+' ('+context.index.type[entity.id]+')');
+					entity.doelniveau_id.splice(dnIndex, 1);
+					if (!entity.doelniveau_id.includes(newId)) { // replacement doelniveau may already be there
+						entity.doelniveau_id.push(newId);
+					}
 				}
 			};
+
+			var replaceDuplicateDoelniveaus = function() {
+				if (!node._tree.generatedDoelniveaus.length) {
+					return;
+				}
+				// build a reverse index for all references to doelniveau's in this context
+				var refIndex = {};
+				Object.keys(context.index.id).forEach(id => {
+					var e = context.index.id[id];
+					if (e.doelniveau_id) {
+						e.doelniveau_id.forEach(childId => {
+							if (!refIndex[childId]) {
+								refIndex[childId] = [];
+							}
+							refIndex[childId].push(id);
+						});
+					}
+				});
+				node._tree.generatedDoelniveaus.forEach(dnId => {
+					var id = findDoelniveau(dnId);
+					if (id && id!=dnId) {
+						// replace references to dn.id to id
+						if (refIndex[dnId]) {
+							refIndex[dnId].forEach(refId => {
+								var entity = context.index.id[refId];
+								replaceDoelniveau(entity, dnId, id);
+							});
+						}
+						// remove dn from context.data.doelniveau
+						context.data.doelniveau = context.data.doelniveau.filter(e => e.id!=dnId);
+						delete context.index.id[dnId];
+						delete context.index.type[dnId];
+					} else {
+						console.log('No substitute doelniveau found for '+dnId);
+					}
+				});
+			}
 
 			function mergeEntityChildrenWithOtherNiveaus(entity, original, context) {
 				var schema = curriculum.index.schema[original.id];
@@ -888,31 +944,6 @@
 						}
 					}
 				});
-/*
-
-					if (original.doelniveau_id) {
-						original.doelniveau_id.forEach(dnId => {
-							let dn = curriculum.index.id[dnId];
-							if (entity.doelniveau_id && entity.doelniveau_id.indexOf(dnId)!== -1) {
-								return; // already linked
-							}
-							if (!dn.niveau_id) {
-								// broken doelniveau, keep it, we'll fix it later
-								if (!entity.doelniveau_id) {
-									entity.doelniveau_id = [];
-								}
-								entity.doelniveau_id.push(dn.id);
-							} else if (!dn.niveau_id.every(niId => context.niveaus.includes(niId))) {
-								// this doelniveau contains a niveau id that is not in the uploaded excel sheet
-								// so add this doelniveau to the entity
-								if (!entity.doelniveau_id) {
-									entity.doelniveau_id = [];
-								}
-								entity.doelniveau_id.push(dn.id);
-							}
-						});
-					}
-*/
 			}
 
 			tree.walk(node, function(myNode, parents) {
@@ -950,6 +981,7 @@
 								delete entity.niveau_id;
 							} else {
 								context.errors.push(new Error(myNode._tree.fileName, 'Eigenschap &quot;'+prop+'&quot; is onbekend voor '+myNodeType, myNode, [myNode]));
+								console.log('unknown prop',prop,properties,myNodeType);
 							}
 						}
 					}
@@ -984,7 +1016,8 @@
 				}
 			});
 			if (!context.errors || !context.errors.length) {
-				filterDuplicateDoelniveaus();
+				//filterDuplicateDoelniveaus();
+				replaceDuplicateDoelniveaus();
 			}
 			return context;
 		},
@@ -998,32 +1031,46 @@
 			         .replace(/'/g, "&#039;");
 			}
 
-			var hasDiff = function(newEntity, originalEntity) {
-				var props = Object.keys(newEntity);
+			var is_string = function(e) {
+				return typeof e == 'string' || e instanceof String;
+			};
+
+			var onewayDiff = function(entityA, entityB) {
+				//FIXME: check only properties from schema
+				var props = Object.keys(entityA).filter(p => p.substr(0,1)!='_').filter(p => p!='dirty' && p!='sloID');
 				for (var i=0,l=props.length;i<l;i++) {
 					var p = props[i];
-					if (!originalEntity[p]) {
-						return true;
+					if (!entityA[p] && !entityB[p]) {
+						return false; // empty values or undefined or '' are the same
 					}
-					if (typeof originalEntity[p] != typeof newEntity[p]) {
-						return true;
+					if (!entityB[p]) {
+						return true; // entityA[p] is not empty, entityB[p] is
 					}
-					if (Array.isArray(originalEntity[p])) {
-						if (originalEntity[p].length != newEntity[p].length) {
+					if (typeof entityB[p] != typeof entityA[p]) {
+						return true; // at least one of them is not empty and types do not match
+					}
+					if (Array.isArray(entityB[p])) {
+						if (entityB[p].length != entityA[p].length) {
 							return true;
 						}
-						var so = new Set(originalEntity[p]);
-						var se = new Set(newEntity[p]);
+						var so = new Set(entityB[p]);
+						var se = new Set(entityA[p]);
 						for (var v of se) {
 							if (!so.has(v)) {
 								return true;
 							}
 						}
-					} else if (originalEntity[p]!=newEntity[p]) {
-						return true;
+					} else if (entityB[p]!=entityA[p]) {
+						if (!is_string(entityB[p]) || !is_string(entityA[p]) || entityB[p].trim() != entityA[p].trim()) {
+							return true; // at least one of them is not empty and values do not match
+						}
 					}
 				}
-				return false;	
+				return false;
+			};
+
+			var hasDiff = function(newEntity, originalEntity) {
+				return onewayDiff(newEntity, originalEntity) || onewayDiff(originalEntity, newEntity);
 			};
 
 			var cleanupByContext = function(contextName, type, entities) {
@@ -1090,46 +1137,63 @@
 			output += '<p>Selecteer de contexten die u wilt opslaan</p>';
 			output += '<form data-simply-command="handle-changes">';
 			var schemas = toCurriculumContext(sheetContexts);
+			var total = 0;
 			Object.keys(schemas).forEach(c => {
-				output += '<details class="slo-changes slo-changes-context">';
-				output += '<summary><input type="checkbox" checked name="applyChanges" value="'+escapeHtml(c)+'">' + escapeHtml(c) + '</summary>';
+				var schemaTotal = 0;
+				schemaOutput = '<details class="slo-changes slo-changes-context">';
+				schemaOutput += '<summary><input type="checkbox" checked name="applyChanges" value="'+escapeHtml(c)+'">' + escapeHtml(c) + '</summary>';
 				Object.keys(schemas[c]).forEach(p => {
 					var count = schemas[c][p].length;
 					if (!count) {
 						return;
 					}
-					output += '<details class="slo-changes slo-changes-type"><summary>' + escapeHtml(p) + ': ' + (count==1 ? '1 entiteit' : count + ' entiteiten') + '</summary>';
+					schemaTotal+=count;
+					schemaOutput += '<details class="slo-changes slo-changes-type"><summary>' + escapeHtml(p) + ': ' + (count==1 ? '1 entiteit' : count + ' entiteiten') + '</summary>';
 					schemas[c][p].forEach(e => {
-						output += '<div class="slo-changes slo-changes-entity';
+						schemaOutput += '<div class="slo-changes slo-changes-entity';
 						var change = false;
 						if (curriculum.index.id[e.id]) {
 							change = curriculum.index.id[e.id];
-							output += ' slo-changes-entity-updated';
+							schemaOutput += ' slo-changes-entity-updated';
 						} else {
-							output += ' slo-changes-entity-new';
+							schemaOutput += ' slo-changes-entity-new';
 						}
-						output += '">';
+						schemaOutput += '">';
 						Object.keys(e).forEach(ep => {
 							if (Array.isArray(e[ep])) {
-								output += escapeHtml(ep)+': '+getDiff(e[ep], change[ep]);
+								var diff = getDiff(e[ep], change[ep]);
+								if (diff != ',') {
+									schemaOutput += escapeHtml(ep)+': '+diff+'<br>';
+								}
 							} else {
-								output += escapeHtml(ep)+': <ins>'+JSON.stringify(e[ep])+'</ins>';
-								if (change && change[ep] != e[ep]) {
-									output += ' (was: <del>'+JSON.stringify(change[ep])+'</del>)';
+								if (change && change[ep] != e[ep] && (change[ep] || e[ep])) {
+									schemaOutput += escapeHtml(ep)+': <ins>'+JSON.stringify(e[ep])+'</ins>';
+									schemaOutput += ' (was: <del>'+JSON.stringify(change[ep])+'</del>)'+'<br>';
+								} else if (['title','prefix','id'].includes(ep)) {
+									schemaOutput += escapeHtml(ep)+': '+JSON.stringify(e[ep])+'<br>';
 								}
 							}
-							output += '<br>';
 						});
-						output += '</div>';
+
+						schemaOutput += '</div>';
 					});
-					output += '</details>';
+					schemaOutput += '</details>';
 				});
-				output += '</details>';
+				schemaOutput += '</details>';
+				if (schemaTotal>0) {
+					output += schemaOutput;
+					total+=schemaTotal;
+				}
 			});
 			output += '<div><button>Verwerk wijzigingen</button></div>';
-			el.innerHTML = output;
-			console.log(schemas);
-			editor.pageData.changedSchemas = schemas;
+			if (total>0) {
+				el.innerHTML = output;
+				console.log(schemas);
+				editor.pageData.changedSchemas = schemas;
+			} else {
+				el.innerHTML = '<h3>Geen wijzigingen gevonden</h3>';
+				editor.pageData.changedSchemas = [];
+			}
 		},
 		findSchema: function(prop) {
 			prop = prop.trim().toLowerCase();

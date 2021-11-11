@@ -1,5 +1,23 @@
 var mergeContext = (function() {
 	
+	function matches(a,b) {
+		if (a && b && a !== b ) {
+			// both entries are not empty and not the same
+			return false;
+		}
+		if (!a && !b) {
+			// both entries are empty
+			return true;
+		}
+		if (a === b) {
+			// both entries are identical
+			return true;
+		}
+		// at least one entry is not empty
+		// and both entries are not the same
+		return false;
+	}
+
 	return {
 		getChanges: function(context) {
 			var changes = {};
@@ -28,7 +46,7 @@ var mergeContext = (function() {
 								if (Array.isArray(entity[property])) {
 									// TODO: for now, allow only additions
 									
-								} else if ( entity[property]!==original[property]) {
+								} else if ( !matches(entity[property],original[property]) ) {
 									entity.dirty = 1;
 									change.id = entity.id;
 									change[property] = entity[property];

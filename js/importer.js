@@ -5,6 +5,9 @@
         },
         commands: {
             uploadXLSX: function(form, values) {
+                editor.pageData.errors = [];
+                editor.pageData.validation = [];
+                contexts = [];
                 document.body.dataset.loading="true";
                 var files = Array.from(form.files.files);
                 return tree.importXLSX(files, values.context)
