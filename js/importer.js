@@ -383,7 +383,9 @@
                     'curriculum-doelgroepteksten': 'slonl/curriculum-doelgroepteksten',
                     'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten',
                     'curriculum-inhoudslijnen': 'slonl/curriculum-inhoudslijnen',
-                    'curriculum-referentiekader': 'slonl/curriculum-referentiekader'
+                    'curriculum-referentiekader': 'slonl/curriculum-referentiekader',
+					'curriculum-niveauhierarchie': 'slonl/curriculum-niveauhierarchie',
+					'curriculum-erk': 'slonl/curriculum-erk'
                 };
                 var branch = 'editor';
 
