@@ -140,7 +140,6 @@
 			this.id = node.id;
 			this.type = node.type;
 		} else {
-			if (node.id==='292114fb-6f7a-4fdf-a59a-81980dfe7573') { debugger; }
 			var referencesKey = 'verwijst naar';
 			if (!node[referencesKey]) {
 				referencesKey = 'verwijst naar:';
@@ -479,7 +478,11 @@
 					if (!node.parentId) {
 						return;
 					}
-					let parent = findNodeByID(node.parentId, index); // find last definition of parentId
+					let parentId = node.parentId;
+					if (ids[parentId]) {
+						parentId = ids[parentId];
+					}
+					let parent = findNodeByID(parentId, index); // find last definition of parentId
 					if (parent && !canHaveChild(parent, node)) {
 						// maybe need to insert doelniveau
 						if (hasDoelniveauLink(parent, node)) {
