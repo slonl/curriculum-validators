@@ -279,7 +279,9 @@
 					for (var i=0,l=refProps.length; i<l; i++) {
 						for (var ii=0,ll=e[refProps[i]].length; ii<ll; ii++) {
 							var id = e[refProps[i]][ii];
-							if (!changedIds[id] && !curriculum.index.id[id]) {
+							if (refProps[i]=='replaces' && !changedIds[id] && !curriculum.index.deprecated[id]) {
+								return true;
+							} else if (refProps[i]!=='replaces' && !changedIds[id] && !curriculum.index.id[id]) {
 								return true;
 							}
 						}
