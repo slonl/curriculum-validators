@@ -377,7 +377,6 @@
             start: function(user, pass) {
                 var schemas = {
                     'curriculum-basis': 'slonl/curriculum-basis',
-                    'curriculum-lpib': 'slonl/curriculum-lpib',
                     'curriculum-kerndoelen': 'slonl/curriculum-kerndoelen',
                     'curriculum-examenprogramma': 'slonl/curriculum-examenprogramma',
                     'curriculum-examenprogramma-bg': 'slonl/curriculum-examenprogramma-bg',
