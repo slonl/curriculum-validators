@@ -286,7 +286,7 @@
 	function getRoots(id) {
 		var references = referencesInContext(id);
 		if (!references.length) {
-			return id;
+			return [id];
 		} else {
 			return [... new Set(references.map(refId => getRoots(refId)).flat())];
 		}
@@ -389,6 +389,9 @@
 				
 				// get node with id with highest index < topIndex
 				var findNodeByID = function(id, topIndex) {
+					if (!myTree.ids[id]) {
+						return null
+					}
 					var allNodes = myTree.ids[id].slice();
 					allNodes.reverse();
 					var node = null;
@@ -489,6 +492,9 @@
 							// insert doelniveau, move next set of child rows to that doelniveau, if possible
 							insertDoelniveau(parent, node, myTree);
 						}
+					}
+					if (!parent) {
+						myTree.errors.push(new Error(myTree.fileName,'Missende Parent '+parentId,node,[node],['ParentID']));
 					}
 				});
 			};
@@ -838,7 +844,11 @@
 				var possibles = new Set;
 				for (const childId of getChildren(dn)) {
 					// find all doelniveaus that reference this child
-					var childDnRefs = new Set(curriculum.index.references[childId].filter(id => curriculum.index.type[id]=='doelniveau'));
+					var refs = curriculum.index.references[childId];
+					if (!refs) {
+						return false; // no current entities reference this childId, e.g. because it is new in this sheet
+					}
+					var childDnRefs = new Set(refs.filter(id => curriculum.index.type[id]=='doelniveau'));
 					if (!possibles.size) {
 						possibles = childDnRefs;
 					} else {
