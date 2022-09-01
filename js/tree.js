@@ -101,6 +101,14 @@
 		this.children = [];
 		this.deletedChildren = [];
 		this.parents = [];
+		if (curriculum.index.id[node.id]) {
+			let original = curriculum.index.id[node.id]
+			Object.keys(original).forEach(prop => {
+				if (typeof node[prop] === 'undefined') {
+					node[prop] = original[prop]
+				}
+			})
+		}
 		Object.defineProperty(this, '_row', {
 			get: function() {
 				return this._rows.join(',');
