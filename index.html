@@ -78,16 +78,7 @@
             <div class="slo-space">
             	<p>Kies de juiste context en upload een excel bestand met nieuwe data</p>
                 <form data-simply-command="uploadXLSX" class="slo-grid slo-grid-3" data-simply-collection="upload">
-					<select name="context" data-simply-element="context">
-						<option>curriculum-basis</option>
-						<option>curriculum-lpib</option>
-						<option>curriculum-kerndoelen</option>
-						<option>curriculum-examenprogramma</option>
-						<option>curriculum-examenprogramma-bg</option>
-						<option>curriculum-syllabus</option>
-						<option>curriculum-leerdoelenkaarten</option>
-						<option>curriculum-inhoudslijnen</option>
-						<option>curriculum-referentiekader</option>
+					<select id="contextselect" name="context" data-simply-element="context">
 					</select>
 					<label class="slo-button">
 						<span class="slo-label" data-simply-field="selected-files">Selecteer bestanden</span>
@@ -195,32 +186,32 @@
     <div class="slo-dialog-overlay"></div>
 
 
-<script src="https://canary.simplyedit.io/1/simply-edit.js" xsrc="https://yvo.muze.nl/simply-edit/js/simply-edit.js" xsrc="https://cdn.simplyedit.io/1/simply-edit.js" data-simply-storage="none"></script>
-<script src="js/GitHub.bundle.js"></script>
-<script src="/js/simply/simply.everything.js"></script>
+<script src="https://canary.simplyedit.io/1/simply-edit.js" data-simply-storage="none"></script>
+<script src="node_modules/simplyview/dist/simply.everything.js"></script>
 <script>
     simply.route.init({
         root: '/importeer-tool/'
     });
-
-	window.repos = {
-        'curriculum-lpib': 'slonl/curriculum-lpib',
-        'curriculum-basis': 'slonl/curriculum-basis',
-        'curriculum-kerndoelen': 'slonl/curriculum-kerndoelen',
-        'curriculum-examenprogramma': 'slonl/curriculum-examenprogramma',
-        'curriculum-examenprogramma-bg': 'slonl/curriculum-examenprogramma-bg',
-        'curriculum-syllabus': 'slonl/curriculum-syllabus',
-        'curriculum-doelgroepteksten': 'slonl/curriculum-doelgroepteksten',
-        'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten',
-        'curriculum-inhoudslijnen': 'slonl/curriculum-inhoudslijnen',
-        'curriculum-referentiekader': 'slonl/curriculum-referentiekader'        
-    };
-	
 </script>
 
-<script src="https://unpkg.com/json-schema-ref-parser@6.0.0/dist/ref-parser.min.js"></script>
-<script src="https://unpkg.com/lodash@4.17.11/lodash.min.js"></script>
-<script src="js/curriculum.js"></script>
+<script src="curriculum-contexts.txt" type="text/plain" id="contexts"></script>
+<script>
+    let contexts = document.getElementById('contexts').src;
+    fetch(contexts)
+    .then(res => res.text())
+    .then(text => {
+        window.repos = text
+            .split(/\n/g)
+            .map(line => line.trim())
+            .filter(Boolean)
+        let select = document.getElementById('contextselect')
+        select.options.length=0
+        for (i in window.repos) {
+            select.options[select.options.length] = new Option(window.repos[i], i)
+        }
+    })
+</script>
+<script src="node_modules/curriculum-js/dist/browser.js"></script>
 <script src="js/importer.js"></script>
 <script>
 

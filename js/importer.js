@@ -1,3 +1,6 @@
+    const Curriculum = window.Curriculum
+    const curriculum = new Curriculum()
+
 	var contexts = [];
     var importTool = simply.app({
         container: document.body,
@@ -133,7 +136,7 @@
                 editor.pageData.changeCount = editor.pageData.changes.length;
                 localStorage.changes = JSON.stringify(editor.pageData.changes);
 
-                  if (editor.pageData.rootEntity) {
+                if (editor.pageData.rootEntity) {
                        var root = curriculum.index.id[editor.pageData.rootEntity];
                     importTool.actions.renderTree(root, editor.pageData.niveau, editor.pageData.schemas);
                 }
@@ -184,7 +187,7 @@
             },
             'save' : function() {
                 if (!editor.pageData.entity.id) {
-                    editor.pageData.entity.id = curriculum.uuidv4();
+                    editor.pageData.entity.id = curriculum.uuid();
                 }
                 importTool.actions.save(clone(editor.pageData.entity));
                    if (editor.pageData.rootEntity) {
@@ -362,7 +365,6 @@
                             }
                         }
                         var file = files.shift();
-//						debugger;
                         return curriculum.sources[file.schema].writeFile(file.path, file.data, message).then(writeFile);
                     }
                     return writeFile();
@@ -373,36 +375,26 @@
                 });
             },
             start: function(user, pass) {
-                var schemas = {
-                    'curriculum-basis': 'slonl/curriculum-basis',
-                    'curriculum-lpib': 'slonl/curriculum-lpib',
-                    'curriculum-kerndoelen': 'slonl/curriculum-kerndoelen',
-                    'curriculum-examenprogramma': 'slonl/curriculum-examenprogramma',
-                    'curriculum-examenprogramma-bg': 'slonl/curriculum-examenprogramma-bg',
-                    'curriculum-syllabus': 'slonl/curriculum-syllabus',
-                    'curriculum-doelgroepteksten': 'slonl/curriculum-doelgroepteksten',
-                    'curriculum-leerdoelenkaarten': 'slonl/curriculum-leerdoelenkaarten',
-                    'curriculum-inhoudslijnen': 'slonl/curriculum-inhoudslijnen',
-                    'curriculum-referentiekader': 'slonl/curriculum-referentiekader'
-                };
+                var schemas = {}
+                window.repos.forEach(repo => {
+                    schemas[repo] = 'slonl/'+repo
+                })
                 var branch = 'editor';
 
                 // get user info
                 // put it in the editor.pageData.user
                 // name and avatar_url
-                var gh = new GitHub({username:user, password: pass});
-                return gh.getUser().getProfile()
+                var gh = new curriculum.Octokit({ auth: pass })
+                return gh.rest.users.getAuthenticated()
                 .then(function(profile) {
-                    editor.pageData.user = profile.data;
+                    console.log('profile',profile)
+                    editor.pageData.user = profile.data
                     document.body.classList.add('slo-logged-on');
-                    return profile;
+                    return profile
                 })
                 .then(function() {
                     return Promise.all(Object.keys(schemas).map(function(context) {
-                        return curriculum.loadContextFromGithub(context, window.repos[context], window.username, window.password, window.branchName)
-						.then(function() {
-							return curriculum.loadData(context);
-						});
+                        return curriculum.loadContextFromGithub(context, context, 'slonl', window.branchName, window.password)
                     }));
                 })
                 .then(function() {
@@ -415,28 +407,6 @@
                         });
                     }));
                 })
-				.then(function() {
-					curriculum.validations = {};
-					validator.loadSchemas(Object.keys(curriculum.schemas));
-/*					return Promise.all(Object.keys(curriculum.schemas).map(function(context) {
-						curriculum.validations[context] = validator.validate(context); //, curriculum.data);
-						return curriculum.validations[context];
-					}));
-*/
-				})
-/*
-				.then(function() {
-					editor.pageData.validation = [];
-					Object.keys(curriculum.validations).forEach(function(context) {
-						if (curriculum.validations[context]!==true) {
-							var validation = curriculum.validations[context];
-						} else {
-							var validation = [ { innerHTML: context+' is helemaal goed.' } ];
-						}
-						editor.pageData.validation = editor.pageData.validation.concat(validation);
-					});
-				})
-*/
                 .then(function() {
                     // restore changes from localstorage;
                     if (localStorage.importChanges) {

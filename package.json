@@ -1,0 +1,23 @@
+{
+  "name": "curriculum-validators",
+  "version": "0.9.0",
+  "description": "Import and Validator for slonl curriculum contexts",
+  "main": "index.html",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slonl/curriculum-validators.git"
+  },
+  "author": "auke@muze.nl",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/slonl/curriculum-validators/issues"
+  },
+  "homepage": "https://github.com/slonl/curriculum-validators#readme",
+  "dependencies": {
+    "curriculum-js": "^0.3.7",
+    "simplyview": "^2.0.2"
+  }
+}
