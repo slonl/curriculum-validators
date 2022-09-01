@@ -363,10 +363,10 @@
 				myTree.all[index] = node;
 				var nodeID = node.id ? (''+node.id).trim() : null;
 				if (!nodeID) {
-					nodeID = node.id = curriculum.uuidv4();
+					nodeID = node.id = curriculum.uuid();
 				} else if (!nodeID.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
 					if (!ids[nodeID]) {
-						ids[nodeID] = curriculum.uuidv4();
+						ids[nodeID] = curriculum.uuid();
 					}
 					nodeID = ids[nodeID];
 				}
@@ -460,7 +460,7 @@
 					var newIndex = myTree.all.length+1;
 					var fakeRow = curriculum.clone(node._rowData);
 					// change id to new uuid, existing doelniveaus will be searched for later
-					fakeRow.id = curriculum.uuidv4();
+					fakeRow.id = curriculum.uuid();
 					fakeRow.type = 'doelniveau';
 					myTree.generatedDoelniveaus.push(fakeRow.id);
 

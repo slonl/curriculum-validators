@@ -393,7 +393,7 @@
                 })
                 .then(function() {
                     return Promise.all(Object.keys(schemas).map(function(context) {
-                        return curriculum.loadContextFromGithub(context, context, 'slonl', window.branchName, window.password)
+                        return curriculum.loadContextFromGithub(context, context, 'slonl', branch, pass)
                     }));
                 })
                 .then(function() {

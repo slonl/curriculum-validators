@@ -194,23 +194,14 @@
     });
 </script>
 
-<script src="curriculum-contexts.txt" type="text/plain" id="contexts"></script>
+<script src="curriculum-contexts.js"></script>
 <script>
-    let contextsURL = document.getElementById('contexts').src;
-    fetch(contextsURL)
-    .then(res => res.text())
-    .then(text => {
-        window.repos = text
-            .split(/\n/g)
-            .map(line => line.trim())
-            .filter(Boolean)
-    });
-    simply.activate.addListener('fillContexts', function() {
-        this.options.length=0
-        for (i in window.repos) {
-            this.options[this.options.length] = new Option(window.repos[i], i)
-        }
-    });
+        simply.activate.addListener('fillContexts', function() {
+            this.options.length=0
+            for (i in window.repos) {
+                this.options[this.options.length] = new Option(window.repos[i], i)
+            }
+        });
 </script>
 <script src="node_modules/curriculum-js/dist/browser.js"></script>
 <script src="js/importer.js"></script>
