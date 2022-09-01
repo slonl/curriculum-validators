@@ -1,42 +1,16 @@
 var validator = (function() {
 
-	var ajv = new Ajv({
-		extendRefs: true,
-		allErrors: true,
-		jsonPointers: true
-	});
-	var ajvContext = null;
-
-	ajv.addKeyword('itemTypeReference', {
-	    validate: function(schema, data, parentSchema, dataPath, parentData, propertyName, rootData) {
-	        var matches = /.*\#\/definitions\/(.*)/g.exec(schema);
-	        if (matches) {
-				if (ajvContext.index.type[data] == matches[1]) {
-					return true;
-				} else if (curriculum.index.type[data] == matches[1]) {
-					return true;
-				} else {
-					return false;
-				}
-	        }
-	        console.log('Unknown #ref definition: '+schema);
-	    }
-	});
-
 	return {
-		loadSchemas: function(contexts) {
-			contexts.forEach(function(context) {
-				ajv.addSchema(curriculum.schemas[context], 'https://opendata.slo.nl/curriculum/schemas/'+context+'/context.json');
-			});
-		},
 		validate: function(contextName, context=null) {
 			if (!context) {
 				context = curriculum;
 			}
-			ajvContext = context;
-			var valid = ajv.validate('https://opendata.slo.nl/curriculum/schemas/'+contextName+'/context.json', context.data);
-			if (!valid) {
-				return validator.mergeErrors(ajv.errors, context);
+			try {
+				var valid = context.validate('https://opendata.slo.nl/curriculum/schemas/'+contextName+'/context.json');
+			} catch(error) {
+				if (error.validationErrors && Array.isArray(error.validationErrors)) {
+					return validator.mergeErrors(error.validationErrors, context);
+				}
 			}
 			return true;
 		},
