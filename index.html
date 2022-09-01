@@ -78,7 +78,7 @@
             <div class="slo-space">
             	<p>Kies de juiste context en upload een excel bestand met nieuwe data</p>
                 <form data-simply-command="uploadXLSX" class="slo-grid slo-grid-3" data-simply-collection="upload">
-					<select id="contextselect" name="context" data-simply-element="context">
+					<select name="context" data-simply-activate="fillContexts" data-simply-element="context">
 					</select>
 					<label class="slo-button">
 						<span class="slo-label" data-simply-field="selected-files">Selecteer bestanden</span>
@@ -196,20 +196,21 @@
 
 <script src="curriculum-contexts.txt" type="text/plain" id="contexts"></script>
 <script>
-    let contexts = document.getElementById('contexts').src;
-    fetch(contexts)
+    let contextsURL = document.getElementById('contexts').src;
+    fetch(contextsURL)
     .then(res => res.text())
     .then(text => {
         window.repos = text
             .split(/\n/g)
             .map(line => line.trim())
             .filter(Boolean)
-        let select = document.getElementById('contextselect')
-        select.options.length=0
+    });
+    simply.activate.addListener('fillContexts', function() {
+        this.options.length=0
         for (i in window.repos) {
-            select.options[select.options.length] = new Option(window.repos[i], i)
+            this.options[this.options.length] = new Option(window.repos[i], i)
         }
-    })
+    });
 </script>
 <script src="node_modules/curriculum-js/dist/browser.js"></script>
 <script src="js/importer.js"></script>

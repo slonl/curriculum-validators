@@ -1,5 +1,4 @@
-    const Curriculum = window.Curriculum
-    const curriculum = new Curriculum()
+    const curriculum = new window.Curriculum()
 
 	var contexts = [];
     var importTool = simply.app({
@@ -417,7 +416,12 @@
                     simply.route.handleEvents();
                     simply.route.match();
                     return true;
-                });
+                })
+				.catch(function(e) {
+					document.body.dataset.loading = "false";
+					editor.pageData['login-error'] = e;
+					throw e;
+				})
             }
         }
     });
