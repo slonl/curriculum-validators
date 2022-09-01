@@ -209,14 +209,21 @@
 		return '['+node._tree.fileName+':'+node._row+']';
 	}
 
-	function parseNodeLevels(tree, node) {
+	function parseNodeLevels(inputTree, node) {
 		if (node.level.substr(0,2)=='--') {
 			return; // this is a comment
 		}
 		var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
-		if (levels && tree.levels) {
-			if (!levels.every(level => tree.levels.includes(level))) {
-				tree.errors.push(new Error(tree.fileName, 'Node bevat een of meer levels die niet in de eerste rij van de sheet staan', node, [tree.roots[0], node]));
+		if (levels && inputTree.levels) {
+			if (!levels.every(level => inputTree.levels.includes(level))) {
+				let original = curriculum.index.id[node.id];
+				if (original) {
+					let niveaus = tree.getNiveausFromLevel(node, inputTree.errors);
+					if (niveaus.every(niveau => original.niveau_id.includes(niveau))) {
+						return levels;
+					}
+				}
+				inputTree.errors.push(new Error(tree.fileName, 'Node bevat een of meer levels die niet in de eerste rij van de sheet staan', node, [tree.roots[0], node]));
 			}
 		}
 		return levels;
@@ -994,7 +1001,7 @@
 				// doing that now, because addChildLink moves some properties around
 				var jsonSchema = tree.findSchema(myNodeType);
 				var properties = jsonSchema.properties[myNodeType].items.properties;
-				var ignoreList = ['_node','_rows','_row','children','deletedChildren','parents','level','type'];
+				var ignoreList = ['_node','_rows','_row','children','deletedChildren','parents','level','type','dirty','unreleased','sloID'];
 				Object.keys(entity).forEach(prop => {
 					if (typeof entity[prop] !== 'undefined' && !properties[prop]) {
 						if (!ignoreList.includes(prop) && entity[prop]!=='') {
@@ -1241,12 +1248,23 @@
 			} else {
 				var levels = node.level.split(',').map(function(level) { return level.trim().toLowerCase(); });
 			}
-			return levels.map(function(level) {
+			var niveaus = levels.map(function(level) {
 				if (curriculum.index.niveauTitle[level]) {
 					return curriculum.index.niveauTitle[level].id;
-				} else {
+				} else if (typeof level !== 'undefined') {
 					errors.push(new Error(node._tree.fileName, 'Onbekend niveau '+level, node, [Object.assign({}, node, {_row: node._rows.join(',')})]));
+				} else {
+					return false
 				}
 			}).filter(Boolean);
+			if (niveaus.length) {
+				return niveaus;	
+			} else {
+				let entity = curriculum.index.id[node.id];
+				if (entity && entity.niveau_id) {
+					return entity.niveau_id;
+				}
+			}
+			return []
 		}
 	};
