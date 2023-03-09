@@ -1,6 +1,7 @@
     const curriculum = new window.Curriculum()
 
 	var contexts = [];
+    var originalEntities = {};
     var importTool = simply.app({
         container: document.body,
         routes : {
@@ -88,18 +89,10 @@
                     return true;
                 })
                 .catch(function(error) {
-                    if (error.path=='/user') {
-                        importTool.view['login-error'] = 'Github login mislukt';
-                        document.body.dataset.loading="false";
-                        return false;
-                    } else {
-                        document.getElementById('login').removeAttribute('open');
-                        importTool.view['login-error'] = '';
-                        if (values.savelogin) {
-                            localStorage.setItem('login',JSON.stringify(values));
-                        }
-                        throw error;
-                    }
+                    importTool.view['login-error'] = 'Github login mislukt';
+                    document.body.dataset.loading="false";
+                    console.error(error);
+                    return false;
                 });
             },
 			'handle-changes': function(form, values) {
@@ -132,44 +125,28 @@
                 }
                 
                 el.parentNode.parentNode.removeChild(el.parentNode);
-                editor.pageData.changeCount = editor.pageData.changes.length;
-                localStorage.changes = JSON.stringify(editor.pageData.changes);
+                importTool.view.changeCount = importTool.view.changes.length;
+                localStorage.changes = JSON.stringify(importTool.view.changes);
 
                 if (editor.pageData.rootEntity) {
-                       var root = curriculum.index.id[editor.pageData.rootEntity];
+                    var root = curriculum.index.id[editor.pageData.rootEntity];
                     importTool.actions.renderTree(root, editor.pageData.niveau, editor.pageData.schemas);
-                }
-                
-                // reload the page to show the changes;
-                if (editor.pageData.entity) {
-                    var entityId = editor.pageData.entity.id;
-                    if (entityId == id) {
-                        if (curriculum.index.id[id]) {
-                            importTool.actions.showEntity(id);
-                        } else if (editor.pageData.rootEntity) {
-                            importTool.actions.showEntity(editor.pageData.rootEntity);
-                        } else {
-                            simply.route.goto(document.location.pathname + '#new/');
-                        }
-                    }                                    
-                } else {
-                    simply.route.goto(document.location.pathname + '#new/');
-                }
+                }                
             },
 			'remove-changes' : function() {
-				editor.pageData.changes = [];
-				editor.pageData.changeCount = 0;
+				importTool.view.changes = [];
+				importTool.view.changeCount = 0;
 				localStorage.changes = JSON.stringify([]);
 			},
             'commit-changes' : function() {
                 document.body.dataset.loading="true";
-                importTool.actions['commit-changes'](editor.pageData.changes, editor.pageData.commitMessage)
+                importTool.actions['commit-changes'](importTool.view.changes, editor.pageData.commitMessage)
                 .then(function(done) {
                     done.sort((a,b)=>b-a).forEach(function(changeIndex) {
-                        editor.pageData.changes.splice(changeIndex, 1);
+                        importTool.view.changes.splice(changeIndex, 1);
                     })
-                    editor.pageData.changeCount = editor.pageData.changes.length;
-                    localStorage.changes = JSON.stringify(editor.pageData.changes);
+                    importTool.view.changeCount = importTool.view.changes.length;
+                    localStorage.changes = JSON.stringify(importTool.view.changes);
                     editor.pageData.commitMessage = '';
                     document.body.dataset.loading="false";
                 })
@@ -242,6 +219,7 @@
 						console.log('building change set: '+type+' ('+schemas[schema][type].length+')');
 						schemas[schema][type].forEach(entity => {
 							var original = curriculum.index.id[entity.id];
+                            originalEntities[entity.id] = original;
 							if (!original) {
 								original = {};
 								Object.assign(original, entity); // overwrite information from entity into the original entity
@@ -281,7 +259,9 @@
 					for (var i=0,l=refProps.length; i<l; i++) {
 						for (var ii=0,ll=e[refProps[i]].length; ii<ll; ii++) {
 							var id = e[refProps[i]][ii];
-							if (!changedIds[id] && !curriculum.index.id[id]) {
+							if (refProps[i]=='replaces' && !changedIds[id] && !curriculum.index.deprecated[id]) {
+								return true;
+							} else if (refProps[i]!=='replaces' && refProps[i]!=='childNodes' && !changedIds[id] && !curriculum.index.id[id]) {
 								return true;
 							}
 						}
@@ -301,8 +281,8 @@
 				} else {
 					Object.keys(changesType).forEach(id => curriculum.index.type[id] = changesType[id]);
 					Object.keys(changesSchema).forEach(id => curriculum.index.schema[id] = changesSchema[id]);
-					editor.pageData.changes = changes;
-					editor.pageData.changeCount = changes.length;
+					importTool.view.changes = changes;
+					importTool.view.changeCount = changes.length;
 				}
 			},
             'commit-changes': function(changes, message) {
@@ -331,6 +311,7 @@
                         delete entity.parents;
                         delete entity.children;
                         delete entity.commit;
+                        delete entity.childNodes;
                         if (!entity.dirty || entity.dirty==="0") {
                             delete entity.dirty;
                         }
@@ -409,8 +390,8 @@
                 .then(function() {
                     // restore changes from localstorage;
                     if (localStorage.importChanges) {
-                        editor.pageData.changes = JSON.parse(localStorage.importChanges);
-                        editor.pageData.changeCount = editor.pageData.changes.length;
+                        importTool.view.changes = JSON.parse(localStorage.importChanges);
+                        importTool.view.changeCount = importTool.view.changes.length;
                     }
                     document.body.dataset.loading = "false";
                     simply.route.handleEvents();
