@@ -8,3 +8,5 @@ curriculum-kerndoelen
 curriculum-leerdoelenkaarten
 curriculum-niveauhierarchie
 curriculum-syllabus
+curriculum-fo
+curriculum-samenhang

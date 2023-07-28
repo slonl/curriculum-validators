@@ -8,5 +8,7 @@ window.repos = [
 	'curriculum-kerndoelen',
 	'curriculum-leerdoelenkaarten',
 	'curriculum-niveauhierarchie',
-	'curriculum-syllabus'
+	'curriculum-syllabus',
+	'curriculum-fo',
+	'curriculum-samenhang'
 ];
